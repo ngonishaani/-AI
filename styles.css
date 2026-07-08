@@ -1,10 +1,10 @@
 :root {
-  --green-900: #042f2f;
-  --green-800: #044f4a;
+  --green-900: #032c2b;
+  --green-800: #045a53;
   --ink-900: #0f172a;
   --ink-700: #334155;
-  --sand-100: #dedcd3;
-  --sand-050: #f2f0e9;
+  --sand-100: #d8d6cc;
+  --sand-050: #ece9e0;
   --white: #ffffff;
   --ring: rgba(4, 47, 47, 0.2);
 }
@@ -24,7 +24,7 @@ body {
 }
 
 .hero {
-  background: linear-gradient(180deg, #055449 0%, var(--green-800) 60%, #065048 100%);
+  background: linear-gradient(180deg, #045a53 0%, #04544d 60%, #044b45 100%);
   color: var(--white);
   text-align: center;
   padding: 3rem 1.25rem 4rem;
@@ -35,7 +35,7 @@ body {
   height: 92px;
   border-radius: 999px;
   margin: 0 auto 1.25rem;
-  background: #041617;
+  background: #051314;
   display: grid;
   place-content: center;
   line-height: 1.1;
