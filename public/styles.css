@@ -289,6 +289,12 @@ body {
   border: 1px solid #a7f3d0;
 }
 
+.message a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .footer {
   text-align: center;
   padding: 1.5rem;

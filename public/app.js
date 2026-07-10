@@ -1,5 +1,8 @@
 const POST_SIGN_REDIRECT_URL = 'https://github.com/ngonishaani/AI4I_Project/invitations';
-const REDIRECT_DELAY_MS = 1500;
+
+function redirectToInvitation() {
+  window.location.assign(POST_SIGN_REDIRECT_URL);
+}
 
 const NDA_SECTIONS = [
   {
@@ -105,8 +108,12 @@ function updatePreview() {
   `;
 }
 
-function showMessage(text, type) {
-  messageEl.textContent = text;
+function showMessage(text, type, isHtml = false) {
+  if (isHtml) {
+    messageEl.innerHTML = text;
+  } else {
+    messageEl.textContent = text;
+  }
   messageEl.className = `message visible ${type}`;
 }
 
@@ -155,21 +162,20 @@ form.addEventListener('submit', async (e) => {
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
     const safeName = payload.teamMemberName.replace(/[^a-zA-Z0-9-_]/g, '_');
-    link.href = url;
-    link.download = `ZimEdu_NDA_${safeName}_${payload.agreementDate}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    const filename = `ZimEdu_NDA_${safeName}_${payload.agreementDate}.pdf`;
 
-    showMessage('NDA signed successfully. Redirecting to the GitHub invitation…', 'success');
+    window.open(url, '_blank');
+
+    showMessage(
+      `NDA signed successfully. Redirecting to the <a href="${POST_SIGN_REDIRECT_URL}">GitHub invitation</a>…`,
+      'success',
+      true
+    );
     submitBtn.textContent = 'Redirecting…';
 
-    setTimeout(() => {
-      window.location.replace(POST_SIGN_REDIRECT_URL);
-    }, REDIRECT_DELAY_MS);
+    redirectToInvitation();
+    setTimeout(redirectToInvitation, 800);
   } catch (err) {
     showMessage(err.message || 'Something went wrong. Please try again.', 'error');
     submitBtn.disabled = false;
