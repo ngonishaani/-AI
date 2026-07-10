@@ -1,0 +1,17 @@
+{
+  "name": "zimedu-nda-signer",
+  "version": "1.0.0",
+  "description": "NDA signing page for ZimEdu / Zimbabwe EdTech Solutions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pdfkit": "^0.16.0"
+  }
+}
