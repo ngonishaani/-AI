@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const { getClientIp, generateNdaPdf } = require('./lib/nda-pdf');
-const { sendNdaCopy } = require('./lib/send-nda-email');
 const { storeNdaBlob } = require('./lib/store-nda-blob');
 
 const app = express();
@@ -37,22 +36,13 @@ app.post('/api/generate-nda', async (req, res) => {
     const safeName = teamMemberName.trim().replace(/[^a-zA-Z0-9-_]/g, '_');
     const filename = `ZimEdu_NDA_${safeName}_${agreementDate}.pdf`;
 
-    await Promise.all([
-      sendNdaCopy({
-        teamMemberName: teamMemberName.trim(),
-        agreementDate,
-        ipAddress,
-        pdfBuffer,
-        filename,
-      }),
-      storeNdaBlob({
-        teamMemberName: teamMemberName.trim(),
-        agreementDate,
-        ipAddress,
-        pdfBuffer,
-        filename,
-      }),
-    ]);
+    await storeNdaBlob({
+      teamMemberName: teamMemberName.trim(),
+      agreementDate,
+      ipAddress,
+      pdfBuffer,
+      filename,
+    });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
