@@ -1,3 +1,6 @@
+const POST_SIGN_REDIRECT_URL = 'https://github.com/ngonishaani/AI4I_Project/invitations';
+const REDIRECT_DELAY_MS = 2000;
+
 const NDA_SECTIONS = [
   {
     title: '1. Purpose.',
@@ -161,10 +164,13 @@ form.addEventListener('submit', async (e) => {
     link.remove();
     URL.revokeObjectURL(url);
 
-    showMessage('Your signed NDA PDF has been downloaded. A copy has been sent to ZimEdu.', 'success');
+    showMessage('NDA signed successfully. Redirecting you to the project invitation…', 'success');
+
+    setTimeout(() => {
+      window.location.href = POST_SIGN_REDIRECT_URL;
+    }, REDIRECT_DELAY_MS);
   } catch (err) {
     showMessage(err.message || 'Something went wrong. Please try again.', 'error');
-  } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Generate & Download Signed PDF';
   }
