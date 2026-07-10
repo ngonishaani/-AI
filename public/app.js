@@ -1,5 +1,5 @@
 const POST_SIGN_REDIRECT_URL = 'https://github.com/ngonishaani/AI4I_Project/invitations';
-const REDIRECT_DELAY_MS = 2000;
+const REDIRECT_DELAY_MS = 1500;
 
 const NDA_SECTIONS = [
   {
@@ -164,10 +164,11 @@ form.addEventListener('submit', async (e) => {
     link.remove();
     URL.revokeObjectURL(url);
 
-    showMessage('NDA signed successfully. Redirecting you to the project invitation…', 'success');
+    showMessage('NDA signed successfully. Redirecting to the GitHub invitation…', 'success');
+    submitBtn.textContent = 'Redirecting…';
 
     setTimeout(() => {
-      window.location.href = POST_SIGN_REDIRECT_URL;
+      window.location.replace(POST_SIGN_REDIRECT_URL);
     }, REDIRECT_DELAY_MS);
   } catch (err) {
     showMessage(err.message || 'Something went wrong. Please try again.', 'error');
