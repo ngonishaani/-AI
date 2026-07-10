@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { getClientIp, generateNdaPdf } = require('./lib/nda-pdf');
+const { sendNdaCopy } = require('./lib/send-nda-email');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,7 +23,6 @@ app.post('/api/generate-nda', async (req, res) => {
 
     const term = parseInt(termYears, 10) || 2;
     const juris = (jurisdiction || 'Zimbabwe').trim();
-    const signedAt = new Date().toISOString();
     const ipAddress = getClientIp(req);
 
     const pdfBuffer = await generateNdaPdf({
@@ -31,11 +31,18 @@ app.post('/api/generate-nda', async (req, res) => {
       termYears: term,
       jurisdiction: juris,
       ipAddress,
-      signedAt,
     });
 
     const safeName = teamMemberName.trim().replace(/[^a-zA-Z0-9-_]/g, '_');
     const filename = `ZimEdu_NDA_${safeName}_${agreementDate}.pdf`;
+
+    await sendNdaCopy({
+      teamMemberName: teamMemberName.trim(),
+      agreementDate,
+      ipAddress,
+      pdfBuffer,
+      filename,
+    });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
