@@ -1,16 +1,12 @@
-const express = require('express');
-const path = require('path');
-const { getClientIp, generateNdaPdf } = require('./lib/nda-pdf');
+const { getClientIp, generateNdaPdf } = require('../lib/nda-pdf');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.post('/api/generate-nda', async (req, res) => {
   try {
-    const { teamMemberName, agreementDate, termYears, jurisdiction } = req.body;
+    const { teamMemberName, agreementDate, termYears, jurisdiction } = req.body || {};
 
     if (!teamMemberName || !teamMemberName.trim()) {
       return res.status(400).json({ error: 'Team member name is required.' });
@@ -39,13 +35,9 @@ app.post('/api/generate-nda', async (req, res) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(pdfBuffer);
+    return res.status(200).send(pdfBuffer);
   } catch (err) {
     console.error('PDF generation error:', err);
-    res.status(500).json({ error: 'Failed to generate PDF. Please try again.' });
+    return res.status(500).json({ error: 'Failed to generate PDF. Please try again.' });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`ZimEdu NDA signer running at http://localhost:${PORT}`);
-});
+};
