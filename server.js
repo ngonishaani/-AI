@@ -36,16 +36,16 @@ app.post('/api/generate-nda', async (req, res) => {
     const safeName = teamMemberName.trim().replace(/[^a-zA-Z0-9-_]/g, '_');
     const filename = `ZimEdu_NDA_${safeName}_${agreementDate}.pdf`;
 
-    try {
-      await storeNdaBlob({
-        teamMemberName: teamMemberName.trim(),
-        agreementDate,
-        ipAddress,
-        pdfBuffer,
-        filename,
-      });
-    } catch (storeErr) {
-      console.error('NDA Blob storage error:', storeErr);
+    const storageResult = await storeNdaBlob({
+      teamMemberName: teamMemberName.trim(),
+      agreementDate,
+      ipAddress,
+      pdfBuffer,
+      filename,
+    });
+
+    if (!storageResult.stored) {
+      console.warn('NDA Blob storage skipped or failed:', storageResult.reason || 'unknown');
     }
 
     res.setHeader('Content-Type', 'application/pdf');
