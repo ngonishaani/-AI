@@ -13,14 +13,30 @@ const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const MODEL_FALLBACKS = [
   DEFAULT_MODEL,
   "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
   "gemini-1.5-flash",
   "gemini-1.5-flash-latest",
   "gemini-flash-latest",
 ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
+let lastGemini = {
+  ok: false,
+  configured: false,
+  model: null,
+  error: null,
+  testedAt: null,
+};
+
+export function getGeminiDiagnostics() {
+  return {
+    ...lastGemini,
+    configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+  };
+}
+
 function looksShona(text) {
   const t = String(text || "").toLowerCase();
-  return /\b(mhoro|masikati|manheru|makadii|ndinoda|ndiri|zvakanaka|tatenda|ndatenda|handizive|ko|here|ndipei|ndapota|shops?\s+dziripi|nguva|kuvhura|kuvhara|chii|pane|sei)\b/i.test(
+  return /\b(mhoro|masikati|manheru|makadii|ndinoda|ndiri|zvakanaka|tatenda|ndatenda|handizive|ndipei|ndapota|nguva|kuvhura|kuvhara|chii|pane|sei|tiri|hendai|tour)\b/i.test(
     t
   );
 }
@@ -28,11 +44,12 @@ function looksShona(text) {
 function directoryFallbackReply(userText) {
   const q = String(userText || "").toLowerCase();
   const shona = looksShona(userText);
+  const geminiOff = !process.env.GEMINI_API_KEY?.trim();
 
   if (!q.trim()) {
     return shona
-      ? `Mhoro! Ndiri assistant we${MALL.name} ku${MALL.city}. Mundibvunze nezve shops, dining, nguva yekuvhura, kana space yekutengesa.`
-      : `Hi — I’m the Trade Square Mall assistant in Kwekwe. Ask me about shops, dining, hours, events, or leasing space.`;
+      ? `Mhoro! Ndiri pa Trade Square Mall ku Kwekwe. Ndingakubatsirei nei nhasi — shops, dining, kana tour?`
+      : `Hi! I’m here for Trade Square Mall in Kwekwe — shops, dining, hours, or a quick tour. What do you need?`;
   }
 
   if (
@@ -41,23 +58,25 @@ function directoryFallbackReply(userText) {
     )
   ) {
     return shona
-      ? `Mhoro zvakanaka 😊 Tikugamuchira ku${MALL.name}, ${MALL.city}. Mundibvunze nezve shops, dining, nguva, events, kana shop space.`
-      : `Hi, welcome to ${MALL.name} in ${MALL.city} 😊 Ask me about shops, dining, hours, events, or leasing — English or Shona is fine.`;
+      ? `Mhoro zvakanaka 😊 Tikugamuchira ku Trade Square. Unoda shops, dining, nguva yekuvhura, kana tour yemall?`
+      : `Hey, welcome to Trade Square 😊 Looking for shops, dining, opening hours, or a mall tour?`;
   }
 
-  if (
-    /\b(hours?|open(ing)?|clos(e|ing)|nguva|kuvhura|kuvhara)\b/.test(q)
-  ) {
+  if (/\b(tour|walk\s*through|show\s*me\s*around|nditour|ndiite tour)\b/.test(q)) {
+    return shona
+      ? `Zvakanaka — tour ye Trade Square inofamba 12 sqm ne 25 sqm shop bays, Training Center, then rooftop cocktail bar / night club. Partitioning yemashops iri mahara. Ungada kuti ndikutsigire book tour here, kana ndikutaurire floor by floor?`
+      : `Sure — a Trade Square tour walks the 12 and 25 sqm shop bays, the Training Center, then the rooftop cocktail bar / night club. Shop partitioning is free. Want a floor-by-floor walkthrough, or tips on booking a visit?`;
+  }
+
+  if (/\b(hours?|open(ing)?|clos(e|ing)|nguva|kuvhura|kuvhara)\b/.test(q)) {
     const lines = HOURS.map((h) => `• ${h.days}: ${h.text}`).join("\n");
     return shona
-      ? `Nguva yekuvhura ye mall:\n${lines}\n\nMall hours above — come through anytime we’re open.`
-      : `Mall hours:\n${lines}`;
+      ? `Nguva yekuvhura:\n${lines}`
+      : `We’re open:\n${lines}`;
   }
 
   if (/\b(where|address|location|maps?|directions?|kupi|kwakirwa)\b/.test(q)) {
-    return shona
-      ? `${MALL.name} iri ku${MALL.city}, Zimbabwe.\nMap: ${MALL.mapsUrl}`
-      : `${MALL.address}\nMap: ${MALL.mapsUrl}`;
+    return `${MALL.address}\nMap: ${MALL.mapsUrl}`;
   }
 
   if (/\b(events?|official opening)\b/.test(q)) {
@@ -72,7 +91,7 @@ function directoryFallbackReply(userText) {
 
   if (/\b(dine|dining|eat|food|lounge|cocktail|nightlife|bars?|chikafu)\b/.test(q)) {
     return (
-      (shona ? "Dine & nightlife (rooftop):\n" : "Dine & nightlife:\n") +
+      (shona ? "Pamusoro (rooftop):\n" : "Up on the roof:\n") +
       DINING.map((d) => `• ${d.name} (${d.level}) — ${d.summary}`).join("\n")
     );
   }
@@ -96,9 +115,8 @@ function directoryFallbackReply(userText) {
       list = findPlace(userText);
     }
     if (!list.length) list = SHOPS;
-    const header = shona ? "Shop directory / zvitoro:\n" : "Shop directory:\n";
     return (
-      header +
+      (shona ? "Hezvino zvitoro zviripo:\n" : "Here’s what’s in the directory:\n") +
       list
         .slice(0, 10)
         .map((s) => `• ${s.name} [${s.category}] · ${s.level} — ${s.summary}`)
@@ -106,55 +124,63 @@ function directoryFallbackReply(userText) {
     );
   }
 
+  // Unknown query — natural nudge (and hint if Gemini key missing)
+  if (geminiOff) {
+    return shona
+      ? `Ndinokwanisa kukubatsira nezve shops, dining, nguva, tour, kana leasing pa Trade Square. Chii chaunoda? (AI Gemini haisati yaiswa — isa GEMINI_API_KEY pa Render.)`
+      : `I can help with shops, dining, hours, a mall tour, or leasing at Trade Square — what are you after?\n\n(Note: Gemini isn’t configured yet. Add GEMINI_API_KEY in Render → Environment, then message “test gemini”.)`;
+  }
+
   return shona
-    ? `Ndinokwanisa kukubatsira nezve shop directory ye Trade Square, dining, nguva, events, amenities, ne leasing. Edza “shops on ground floor”, “hours”, kana “rooftop lounge”. Website: ${MALL.website}`
-    : `I can help with Trade Square’s shop directory, dining, hours, events, amenities, and leasing. Try “shops on ground floor”, “hours”, or “rooftop lounge”. Website: ${MALL.website}`;
+    ? `Ndinokwanisa kukubatsira nezve shops, dining, nguva, tour, kana leasing. Chii chaunoda nhasi?`
+    : `I can help with shops, dining, hours, a mall tour, or leasing — what would you like?`;
 }
 
 function systemInstruction() {
-  return `You are a friendly Trade Square Mall concierge on WhatsApp for shoppers and tenants in Kwekwe, Zimbabwe.
+  return `You are a friendly human concierge for Trade Square Mall (Kwekwe, Zimbabwe) chatting on WhatsApp.
 
-How you talk (very important):
-- Sound like a natural Zimbabwean assistant: warm, human, short WhatsApp messages (2–5 short lines usually).
-- You understand and reply in English, chiShona (Shona), or a natural mix of both (code-switching), the way people actually chat.
-- Mirror the customer: if they write in Shona, reply mainly in Shona; if English, mainly English; if mixed, mix naturally.
-- Use everyday Shona where it fits (e.g. Mhoro, Masikati, Manheru, Makadii, Zvakanaka, Tatenda, Ndinokwanisa kukubatsira…) but keep shop/brand names in English.
-- Be conversational, not robotic. Light warmth is good; don’t overdo slang or emojis (0–1 emoji max).
-- Never sound like a formal document or a bullet-only robot unless listing shops/hours.
+Talk like a real person texting:
+- Short, warm WhatsApp replies (usually 2–5 short lines). No robot menus unless listing shops/hours.
+- English, chiShona, or natural mix — mirror how the customer writes.
+- For “take me for a tour” / tour requests: walk them through the mall conversationally (ground floor shops → level 1 clothing → level 2 Training Center → rooftop lounge/cocktail bar), mention 12/25 sqm bays and free partitioning when relevant.
+- Never dump a canned “I can help with X, Y, Z. Try …” help menu unless they ask what you can do.
+- Use ONLY the directory facts below for mall details. Don’t invent phones, prices, or tenants.
+- If unknown, say so casually and point to ${MALL.website}.
 
-Grounding rules:
-- Use ONLY the mall directory context below for facts about shops, dining, hours, events, amenities, and location.
-- You may chat casually (greetings, thanks, small talk) without inventing mall facts.
-- If something isn’t in the directory, say you’re not sure — in the user’s language — and suggest https://tradesquaremall.com or booking a tour.
-- Never invent phone numbers, prices, stock, or tenant names that aren’t in the directory.
-- When listing shops: name, floor/level, one short line.
-- For leasing: mention 12 sqm and 25 sqm spaces, free partitioning, and that tours can be booked.
-
-Directory context:
+Directory:
 ${buildDirectoryContext()}`;
 }
 
-async function callGemini(apiKey, model, text) {
+async function callGemini(apiKey, model, text, { useSystemInstruction = true } = {}) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const body = {
-    systemInstruction: {
-      parts: [{ text: systemInstruction() }],
-    },
     contents: [
       {
         role: "user",
-        parts: [{ text }],
+        parts: [
+          {
+            text: useSystemInstruction
+              ? text
+              : `${systemInstruction()}\n\n---\nCustomer WhatsApp message:\n${text}`,
+          },
+        ],
       },
     ],
     generationConfig: {
-      temperature: 0.85,
+      temperature: 0.9,
       topP: 0.95,
       maxOutputTokens: 900,
     },
   };
+
+  if (useSystemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: systemInstruction() }],
+    };
+  }
 
   const res = await fetch(url, {
     method: "POST",
@@ -172,10 +198,69 @@ async function callGemini(apiKey, model, text) {
   }
 
   const parts = data?.candidates?.[0]?.content?.parts || [];
-  return parts
+  const reply = parts
     .map((p) => p.text || "")
     .join("\n")
     .trim();
+
+  const blockReason = data?.candidates?.[0]?.finishReason;
+  if (!reply && blockReason) {
+    throw new Error(`Gemini empty reply (${blockReason})`);
+  }
+  return reply;
+}
+
+export async function testGemini() {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  lastGemini.testedAt = new Date().toISOString();
+  lastGemini.configured = Boolean(apiKey);
+
+  if (!apiKey) {
+    lastGemini.ok = false;
+    lastGemini.error = "GEMINI_API_KEY is missing on Render";
+    lastGemini.model = null;
+    return {
+      ok: false,
+      configured: false,
+      error: lastGemini.error,
+      hint: "Render → Environment → add GEMINI_API_KEY from https://aistudio.google.com/apikey → Save → Manual Deploy",
+    };
+  }
+
+  const probe = "Reply with exactly: GEMINI_OK";
+  let lastErr = null;
+  for (const model of MODEL_FALLBACKS) {
+    for (const useSystemInstruction of [true, false]) {
+      try {
+        const reply = await callGemini(apiKey, model, probe, {
+          useSystemInstruction,
+        });
+        if (reply) {
+          lastGemini.ok = true;
+          lastGemini.model = model;
+          lastGemini.error = null;
+          return {
+            ok: true,
+            configured: true,
+            model,
+            sample: reply.slice(0, 200),
+          };
+        }
+      } catch (err) {
+        lastErr = err?.message || String(err);
+      }
+    }
+  }
+
+  lastGemini.ok = false;
+  lastGemini.model = null;
+  lastGemini.error = lastErr || "All Gemini models failed";
+  return {
+    ok: false,
+    configured: true,
+    error: lastGemini.error,
+    hint: "Check the API key is valid and Gemini API is enabled for the Google project.",
+  };
 }
 
 async function generateMallReply(userText, options = {}) {
@@ -184,8 +269,20 @@ async function generateMallReply(userText, options = {}) {
     return directoryFallbackReply("");
   }
 
+  // WhatsApp self-test command
+  if (/^(test\s*gemini|gemini\s*status|\/gemini)\b/i.test(text)) {
+    const result = await testGemini();
+    if (result.ok) {
+      return `Gemini is working ✅\nModel: ${result.model}\nSample: ${result.sample}`;
+    }
+    return `Gemini is NOT working ❌\n${result.error}\n${result.hint || ""}`.trim();
+  }
+
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
+    lastGemini.ok = false;
+    lastGemini.configured = false;
+    lastGemini.error = "GEMINI_API_KEY missing";
     console.error(
       "GEMINI_API_KEY missing — using directory fallback. Set it in Render → Environment."
     );
@@ -198,22 +295,34 @@ async function generateMallReply(userText, options = {}) {
 
   let lastErr = null;
   for (const model of models) {
-    try {
-      const reply = await callGemini(apiKey, model, text);
-      if (reply) {
-        return reply.length > 3500 ? `${reply.slice(0, 3490)}…` : reply;
+    for (const useSystemInstruction of [true, false]) {
+      try {
+        const reply = await callGemini(apiKey, model, text, {
+          useSystemInstruction,
+        });
+        if (reply) {
+          lastGemini.ok = true;
+          lastGemini.configured = true;
+          lastGemini.model = model;
+          lastGemini.error = null;
+          lastGemini.testedAt = new Date().toISOString();
+          return reply.length > 3500 ? `${reply.slice(0, 3490)}…` : reply;
+        }
+      } catch (err) {
+        lastErr = err?.message || String(err);
+        console.error(
+          `gemini model ${model} (system=${useSystemInstruction}) failed:`,
+          lastErr
+        );
       }
-    } catch (err) {
-      lastErr = err;
-      console.error(
-        `gemini model ${model} failed:`,
-        err?.message || err
-      );
-      // try next model
     }
   }
 
-  console.error("gemini all models failed", lastErr?.message || lastErr);
+  lastGemini.ok = false;
+  lastGemini.configured = true;
+  lastGemini.error = lastErr || "unknown";
+  lastGemini.testedAt = new Date().toISOString();
+  console.error("gemini all models failed", lastErr);
   return directoryFallbackReply(text);
 }
 

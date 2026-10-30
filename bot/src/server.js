@@ -5,6 +5,7 @@ import {
   setPendingPhone,
   maybeRequestPairingCode,
 } from "./pairing.js";
+import { getGeminiDiagnostics, testGemini } from "./gemini.js";
 
 /**
  *   GET  /health /status / /qr /qr.png /pair
@@ -35,6 +36,7 @@ export function startHttpServer({
       const pair = getPairingState();
       const auth = getAuthInfo?.() || {};
       const qr = getLatestQr?.();
+      const gemini = getGeminiDiagnostics();
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
@@ -45,6 +47,10 @@ export function startHttpServer({
           linked: getStatus() === "open",
           qrPending: Boolean(qr),
           geminiConfigured: Boolean(isGeminiConfigured?.()),
+          geminiOk: gemini.ok,
+          geminiModel: gemini.model,
+          geminiError: gemini.error,
+          geminiTestedAt: gemini.testedAt,
           authDir: auth.authDir || null,
           onRenderDisk: Boolean(auth.onRenderDisk),
           renderDiskMounted: Boolean(auth.renderDiskMounted),
@@ -55,6 +61,21 @@ export function startHttpServer({
           error: pair.error,
         })
       );
+      return;
+    }
+
+    if (pathName === "/test-gemini") {
+      try {
+        const result = await testGemini();
+        res.writeHead(result.ok ? 200 : 503, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        });
+        res.end(JSON.stringify(result, null, 2));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: err?.message || String(err) }));
+      }
       return;
     }
 
