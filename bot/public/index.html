@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Trade Square is a modern shopping mall and business destination in the heart of Kwekwe."
+    />
+    <meta name="theme-color" content="#004741" />
+    <title>Trade Square Mall · Kwekwe</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="/assets/index-1067299b.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-1c19cfd8.css">
+    <link rel="stylesheet" href="/assets/shops.css" />
+    <meta name="tsm-catalog-url" content="https://ai-mallbot.onrender.com/catalog" />
+      <link rel="preload" href="/hero-bg.mp4" as="video" type="video/mp4" />
+  </head>
+  <body>
+    <div id="root"></div>
+  
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  var LAT = -18.9281, LNG = 29.8149, ZOOM = 15;
+  function mount(el) {
+    if (!window.L || el.dataset.ready === "1") return;
+    var canvas = el.querySelector(".map-canvas") || el;
+    if (canvas === el) {
+      el.innerHTML = "";
+      canvas = document.createElement("div");
+      canvas.className = "map-canvas";
+      el.appendChild(canvas);
+    }
+    el.dataset.ready = "1";
+    try {
+      var map = L.map(canvas, { scrollWheelZoom: false }).setView([LAT, LNG], ZOOM);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap"
+      }).addTo(map);
+      L.marker([LAT, LNG]).addTo(map).bindPopup("Trade Square Mall · Kwekwe");
+      setTimeout(function () { map.invalidateSize(); }, 250);
+      window.addEventListener("resize", function () { map.invalidateSize(); });
+    } catch (err) {
+      el.dataset.ready = "0";
+      el.innerHTML = '<div class="map-fallback"><a href="https://www.google.com/maps/search/?api=1&query=Trade%20Square%20Mall%2C%20Kwekwe%2C%20Zimbabwe" target="_blank" rel="noreferrer">Open Trade Square Mall on Google Maps →</a></div>';
+    }
+  }
+  function scan() {
+    document.querySelectorAll('[data-map="tradesquare"]').forEach(mount);
+  }
+  var obs = new MutationObserver(scan);
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
+  else scan();
+})();
+</script>
+<script>
+(function () {
+  function addEnrolLinks() {
+    document.querySelectorAll(".nav-links").forEach(function (nav) {
+      if (nav.querySelector('[data-enrol-link="1"]')) return;
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol";
+      a.setAttribute("data-enrol-link", "1");
+      nav.appendChild(a);
+    });
+    document.querySelectorAll(".menu nav").forEach(function (nav) {
+      if (nav.querySelector('[data-enrol-link="1"]')) return;
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol";
+      a.setAttribute("data-enrol-link", "1");
+      nav.appendChild(a);
+    });
+    document.querySelectorAll(".footer-grid ul").forEach(function (list, index) {
+      if (index !== 0 || list.querySelector('[data-enrol-link="1"]')) return;
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol a shop";
+      a.setAttribute("data-enrol-link", "1");
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+  }
+  var obs = new MutationObserver(addEnrolLinks);
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addEnrolLinks);
+  else addEnrolLinks();
+})();
+</script>
+<script src="/assets/site-shops.js" defer></script>
+
+  </body>
+</html>

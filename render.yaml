@@ -1,5 +1,6 @@
 # Trade Square Mall on Render
 # - Web service: WhatsApp bot + mall website (/, /shop, /enroll, assets)
+# - Site files ship in bot/public (works with rootDir: bot)
 # - Catalog API: GET/PUT /catalog (same origin as the site)
 # Dashboard: New → Blueprint → connect this repo → apply render.yaml
 # Docs: docs/render-deploy.md  ·  Requires a paid plan for persistent disk + always-on
@@ -10,9 +11,9 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    # Repo root so the mall static site (index.html, shop/, assets/) is deployed
-    buildCommand: npm install --prefix bot
-    startCommand: npm start --prefix bot
+    rootDir: bot
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     disk:
@@ -25,7 +26,7 @@ services:
       - key: BAILEYS_AUTH_DIR
         value: /var/data/auth_info_baileys
       - key: SITE_ROOT
-        value: /opt/render/project/src
+        value: /opt/render/project/src/public
       - key: LOG_LEVEL
         value: info
       - key: GEMINI_API_KEY
