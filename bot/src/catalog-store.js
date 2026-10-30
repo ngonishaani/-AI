@@ -1,6 +1,8 @@
 /**
  * Persistent enrolled-shop catalog (from tradesquaremall.com/enroll).
  * Stored on disk next to Baileys auth so Render redeploys keep enrolments.
+ * Uploaded shop photos (data URLs) are written under shop-media/ and rewritten
+ * to /media/<file> so WhatsApp can show them when a shop is opened.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +11,7 @@ import { resolveAuthDir } from "./auth-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_FALLBACK = path.join(__dirname, "..", "data", "enrolled-shops.json");
+const MAX_STORED_IMAGE_BYTES = 2 * 1024 * 1024;
 
 function catalogPath() {
   if (process.env.CATALOG_PATH?.trim()) {
@@ -30,22 +33,125 @@ function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-/** Drop huge base64 uploads — they break Cloudflare/Render body limits and WhatsApp menus. */
+/** Directory for persisted shop/product upload bytes (survives redeploys on Render disk). */
+export function mediaDir() {
+  return path.join(path.dirname(catalogPath()), "shop-media");
+}
+
+export function publicBaseUrl() {
+  const raw =
+    process.env.BOT_PUBLIC_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    "https://ai-mallbot.onrender.com";
+  return raw.replace(/\/$/, "");
+}
+
+/** Turn /media/foo.jpg into an absolute URL for the enrol page / WhatsApp URL fetch. */
+export function resolvePublicImageUrl(image) {
+  const value = String(image || "").trim();
+  if (!value) return "";
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("/media/")) return `${publicBaseUrl()}${value}`;
+  return value;
+}
+
+/**
+ * Resolve a catalog image field to a local file path when it points at our media store.
+ * @returns {string|null}
+ */
+export function resolveLocalMediaPath(image) {
+  const value = String(image || "").trim();
+  if (!value) return null;
+  let filename = "";
+  if (value.startsWith("/media/")) {
+    filename = value.slice("/media/".length);
+  } else {
+    try {
+      const u = new URL(value);
+      if (u.pathname.startsWith("/media/")) {
+        filename = u.pathname.slice("/media/".length);
+      }
+    } catch {
+      return null;
+    }
+  }
+  filename = path.basename(filename);
+  if (!filename || filename !== path.basename(filename) || filename.includes("..")) {
+    return null;
+  }
+  if (!/\.(jpe?g|png|webp|gif)$/i.test(filename)) return null;
+  const full = path.join(mediaDir(), filename);
+  return fs.existsSync(full) ? full : null;
+}
+
+function extForMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("gif")) return "gif";
+  return "jpg";
+}
+
+/**
+ * Persist a data-URL upload to shop-media/ and return a portable /media/… path.
+ * Oversized or invalid payloads return "".
+ */
+export function materializeDataUrl(dataUrl, key) {
+  const raw = String(dataUrl || "");
+  const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return "";
+  let buf;
+  try {
+    buf = Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+  } catch {
+    return "";
+  }
+  if (!buf.length || buf.length > MAX_STORED_IMAGE_BYTES) return "";
+
+  const ext = extForMime(match[1]);
+  const base = slugify(key) || `img-${Date.now().toString(36)}`;
+  const filename = `${base}.${ext}`;
+  const dir = mediaDir();
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, filename), buf);
+  return `/media/${filename}`;
+}
+
+function persistImageField(image, key) {
+  const value = String(image || "").trim();
+  if (!value) return { image: "", omitted: false };
+  if (value.startsWith("data:")) {
+    const stored = materializeDataUrl(value, key);
+    if (stored) return { image: stored, omitted: false };
+    return { image: "", omitted: true };
+  }
+  // Already a media path or remote URL — keep as-is
+  if (value.startsWith("/media/") || /^https?:\/\//i.test(value)) {
+    return { image: value, omitted: false };
+  }
+  return { image: value, omitted: false };
+}
+
+/** Persist data-URL uploads to disk; keep http(s) and /media paths. */
 export function sanitizeShopsForStorage(shops) {
   return (Array.isArray(shops) ? shops : []).map((shop) => {
     if (!shop || typeof shop !== "object") return shop;
     const next = { ...shop };
-    if (typeof next.image === "string" && next.image.startsWith("data:")) {
-      next.image = "";
-      next.imageOmitted = true;
-    }
+    const shopKey = slugify(next.id || next.name) || "shop";
+    const shopImg = persistImageField(next.image, shopKey);
+    next.image = shopImg.image;
+    if (shopImg.omitted) next.imageOmitted = true;
+    else delete next.imageOmitted;
+
     if (Array.isArray(next.products)) {
-      next.products = next.products.map((product) => {
+      next.products = next.products.map((product, index) => {
         if (!product || typeof product !== "object") return product;
-        if (typeof product.image === "string" && product.image.startsWith("data:")) {
-          return { ...product, image: "", imageOmitted: true };
-        }
-        return product;
+        const productKey = `${shopKey}-${slugify(product.id || product.name) || `p${index + 1}`}`;
+        const productImg = persistImageField(product.image, productKey);
+        const out = { ...product, image: productImg.image };
+        if (productImg.omitted) out.imageOmitted = true;
+        else delete out.imageOmitted;
+        return out;
       });
     }
     return next;
@@ -153,7 +259,7 @@ export function normalizeEnrolledShop(raw) {
           id: productId,
           name: productName,
           description: String(p.description || productName).trim(),
-          image: String(p.image || raw.image || "").trim(),
+          image: resolvePublicImageUrl(p.image || raw.image || ""),
           link: String(p.link || raw.link || "").trim(),
           includes: Array.isArray(p.includes) ? p.includes : [],
           variations: p.variations.map((v, vi) => ({
@@ -170,7 +276,7 @@ export function normalizeEnrolledShop(raw) {
         id: productId,
         name: productName,
         description: String(p.description || productName).trim(),
-        image: String(p.image || raw.image || "").trim(),
+        image: resolvePublicImageUrl(p.image || raw.image || ""),
         link: String(p.link || raw.link || "").trim(),
         includes: [],
         variations: [
@@ -191,7 +297,7 @@ export function normalizeEnrolledShop(raw) {
       id: "general",
       name: "Ask the shop",
       description: "Message the shop for products and prices.",
-      image: String(raw.image || "").trim(),
+      image: resolvePublicImageUrl(raw.image || ""),
       link: String(raw.link || "").trim(),
       includes: [],
       variations: [
@@ -211,7 +317,7 @@ export function normalizeEnrolledShop(raw) {
     name,
     floor: String(raw.floor || "Trade Square Mall").trim(),
     number: String(raw.number || "").trim() || "—",
-    image: String(raw.image || "").trim(),
+    image: resolvePublicImageUrl(raw.image || ""),
     description: String(raw.description || "").trim() || `${name} at Trade Square Mall.`,
     link: String(raw.link || "").trim() || "https://tradesquaremall.com",
     whatsapp: whatsapp || String(raw.link || "").trim(),
