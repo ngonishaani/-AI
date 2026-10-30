@@ -1,4 +1,4 @@
-# Trade Square Mall — WhatsApp bot (Baileys + cron + Gemini)
+# Trade Square Marketplace — WhatsApp bot (Baileys + cron + Gemini)
 
 Real WhatsApp replies (not Meta Cloud API, not a website chat widget).
 
@@ -8,10 +8,12 @@ Customer WhatsApp
        ▼
 Baileys (WhatsApp Web multi-device socket)  ← always-on Node process
        │
-       ├─ shop directory (shops / dine / hours / events)
-       ├─ Gemini (open-ended answers)
+       ├─ marketplace menus (shops → products → prices / images / store WA)
+       ├─ Gemini (open-ended product questions)
        └─ node-cron (health check every 5 min, hourly presence, optional daily broadcast)
 ```
+
+Trade Square Mall “about” (location, mall hours) is only sent when the customer asks about the place.
 
 ## Requirements
 
@@ -29,7 +31,7 @@ Full steps: [docs/render-deploy.md](../docs/render-deploy.md)
 4. After deploy: open `https://<service>.onrender.com/`
 5. Enter your number (country code, digits only) → **Get pairing code**
 6. Phone: **WhatsApp → Linked Devices → Link a device → Link with phone number instead** → enter the code
-7. Message that WhatsApp number — shop directory + Gemini replies
+7. Message that WhatsApp number — reply *menu* for shops (sample: RoyaleApe) + Gemini replies
 
 Session files live on the Render disk at `/var/data/auth_info_baileys` so redeploys keep the link.
 
@@ -46,7 +48,7 @@ npm start
 1. Open `http://localhost:10000/`
 2. Enter phone (e.g. `26377xxxxxxx`) → get pairing code
 3. WhatsApp → Linked Devices → **Link with phone number instead** → enter code
-4. Message that number — mall bot replies. Auth stays in `auth_info_baileys/` (gitignored).
+4. Message that number — marketplace bot replies (`menu`, shop names, products). Auth stays in `auth_info_baileys/` (gitignored).
 
 ## Cron jobs
 
@@ -70,5 +72,6 @@ pm2 save
 ## Notes
 
 - Groups are ignored unless `BOT_ALLOW_GROUPS=1`.
-- Without `GEMINI_API_KEY`, directory keyword replies still work (shops, hours, dining, etc.).
+- Without `GEMINI_API_KEY`, marketplace menus still work (shops, products, prices, store WhatsApp links).
+- Sample shop catalog: RoyaleApe Studios from [royaleape.com](https://royaleape.com/) (Shop 55).
 - Do not commit `auth_info_baileys/` or `.env`.

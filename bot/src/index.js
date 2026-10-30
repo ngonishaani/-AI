@@ -22,6 +22,18 @@ import {
   resolveAuthDir,
 } from "./auth-path.js";
 import { clearLatestQr, getLatestQr, setLatestQr } from "./qr-state.js";
+import {
+  aboutPlaceText,
+  getProduct,
+  getShop,
+  mainMenuList,
+  parseMenuSelection,
+  productCaption,
+  shopMenuList,
+  shopSummary,
+  textMainMenu,
+  textShopMenu,
+} from "./menus.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -45,6 +57,8 @@ let reconnecting = false;
 let stopCron = null;
 let httpServer = null;
 const recentMsgIds = new Map();
+/** @type {Map<string, { shopId?: string, updatedAt: number }>} */
+const chatState = new Map();
 
 function seenRecently(id) {
   if (!id) return false;
@@ -57,9 +71,30 @@ function seenRecently(id) {
   return false;
 }
 
+function getChatState(jid) {
+  const state = chatState.get(jid);
+  if (!state) return {};
+  if (Date.now() - state.updatedAt > 60 * 60 * 1000) {
+    chatState.delete(jid);
+    return {};
+  }
+  return state;
+}
+
+function setChatShop(jid, shopId) {
+  chatState.set(jid, { shopId, updatedAt: Date.now() });
+}
+
+function clearChatShop(jid) {
+  chatState.set(jid, { updatedAt: Date.now() });
+}
+
 function extractText(msg) {
   const m = msg.message || {};
   return (
+    m.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    m.buttonsResponseMessage?.selectedButtonId ||
+    m.templateButtonReplyMessage?.selectedId ||
     m.conversation ||
     m.extendedTextMessage?.text ||
     m.imageMessage?.caption ||
@@ -69,6 +104,130 @@ function extractText(msg) {
     m.templateButtonReplyMessage?.selectedDisplayText ||
     ""
   ).trim();
+}
+
+async function sendImage(jid, url, caption) {
+  if (!url || !sock) return false;
+  try {
+    await sock.sendMessage(jid, {
+      image: { url },
+      caption: caption || undefined,
+    });
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err: err?.message || err, url: String(url).slice(0, 80) },
+      "image send via url failed — trying buffer"
+    );
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    await sock.sendMessage(jid, {
+      image: buf,
+      caption: caption || undefined,
+    });
+    return true;
+  } catch (err) {
+    logger.warn({ err: err?.message || err }, "image send failed");
+    return false;
+  }
+}
+
+async function sendListOrText(jid, listPayload, textFallback) {
+  try {
+    await sock.sendMessage(jid, listPayload);
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err: err?.message || err },
+      "list menu unsupported — sending text menu"
+    );
+    await sock.sendMessage(jid, { text: textFallback });
+    return false;
+  }
+}
+
+async function sendMainMenu(jid) {
+  clearChatShop(jid);
+  await sendListOrText(jid, mainMenuList(), textMainMenu());
+}
+
+async function sendShopCard(jid, shop) {
+  setChatShop(jid, shop.id);
+  const caption = shopSummary(shop);
+  const sent = await sendImage(jid, shop.image, caption);
+  if (!sent) {
+    await sock.sendMessage(jid, { text: caption });
+  }
+  await sendListOrText(jid, shopMenuList(shop), textShopMenu(shop));
+}
+
+async function sendProductCard(jid, shop, product) {
+  setChatShop(jid, shop.id);
+  const caption = productCaption(shop, product);
+  const sent = await sendImage(jid, product.image || shop.image, caption);
+  if (!sent) {
+    await sock.sendMessage(jid, { text: caption });
+  }
+  await sock.sendMessage(jid, {
+    text: `Reply *chat* to WhatsApp ${shop.name}, a number for another product, or *menu* for all shops.`,
+  });
+}
+
+async function sendWhatsAppLink(jid, shop) {
+  setChatShop(jid, shop.id);
+  await sock.sendMessage(jid, {
+    text: `Chat with *${shop.name}* on WhatsApp:\n${shop.whatsapp}\n\nTell them what you need (size, quantity, deadline). Reply *menu* anytime.`,
+  });
+}
+
+async function handleSelection(jid, selection) {
+  switch (selection.type) {
+    case "menu":
+      await sendMainMenu(jid);
+      return true;
+    case "about":
+      await sock.sendMessage(jid, { text: aboutPlaceText() });
+      return true;
+    case "shop": {
+      const shop = getShop(selection.shopId);
+      if (!shop) {
+        await sock.sendMessage(jid, {
+          text: "I couldn't find that shop. Reply *menu* to see marketplace shops.",
+        });
+        return true;
+      }
+      await sendShopCard(jid, shop);
+      return true;
+    }
+    case "product": {
+      const hit = getProduct(selection.shopId, selection.productId);
+      if (!hit) {
+        await sock.sendMessage(jid, {
+          text: "I couldn't find that product. Reply *menu* to browse shops.",
+        });
+        return true;
+      }
+      await sendProductCard(jid, hit.shop, hit.product);
+      return true;
+    }
+    case "whatsapp": {
+      const shop = getShop(selection.shopId);
+      if (!shop) {
+        await sock.sendMessage(jid, {
+          text: "Shop WhatsApp not found. Reply *menu* to browse.",
+        });
+        return true;
+      }
+      await sendWhatsAppLink(jid, shop);
+      return true;
+    }
+    default:
+      return false;
+  }
 }
 
 async function handleIncoming(msg) {
@@ -87,7 +246,7 @@ async function handleIncoming(msg) {
   const text = extractText(msg);
   if (!text) {
     await sock.sendMessage(jid, {
-      text: "I can read text messages. Ask me about shops, dining, hours, events, or leasing at Trade Square Mall.",
+      text: "Send a text message — reply *menu* to browse shops & products, or ask for something like DTF, hoodies, or websites.",
     });
     return;
   }
@@ -100,9 +259,20 @@ async function handleIncoming(msg) {
     /* ignore */
   }
 
+  const state = getChatState(jid);
+  const selection = parseMenuSelection(text, {
+    currentShopId: state.shopId,
+  });
+
+  if (selection.type !== "chat") {
+    await handleSelection(jid, selection);
+    logger.info({ jid, selection: selection.type }, "menu reply");
+    return;
+  }
+
   const reply = await generateMallReply(text);
   await sock.sendMessage(jid, { text: reply });
-  logger.info({ jid, chars: reply.length }, "replied");
+  logger.info({ jid, chars: reply.length }, "gemini reply");
 }
 
 async function connectToWhatsApp() {
@@ -223,10 +393,10 @@ async function connectToWhatsApp() {
             "failed handling message"
           );
           try {
-            const jid = msg?.key?.remoteJid;
-            if (jid && sock) {
-              await sock.sendMessage(jid, {
-                text: "Sorry — something went wrong. Please try again in a moment.",
+            const remote = msg?.key?.remoteJid;
+            if (remote && sock) {
+              await sock.sendMessage(remote, {
+                text: "Sorry — something went wrong. Reply *menu* to browse shops.",
               });
             }
           } catch {
@@ -283,10 +453,10 @@ httpServer = startHttpServer({
 });
 if (!isGeminiConfigured()) {
   logger.warn(
-    "GEMINI_API_KEY is not set — bot will use directory-only replies until you add it in Render → Environment"
+    "GEMINI_API_KEY is not set — bot will use marketplace menus until you add it in Render → Environment"
   );
 } else {
-  logger.info("Gemini enabled for natural Shona/English replies");
+  logger.info("Gemini enabled for natural Shona/English marketplace replies");
 }
 await connectToWhatsApp();
 stopCron = startCronJobs({

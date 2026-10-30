@@ -2,13 +2,13 @@
   "name": "trade-square-whatsapp-bot",
   "version": "1.0.0",
   "private": true,
-  "description": "Trade Square Mall WhatsApp concierge — Baileys + Gemini + shop directory",
+  "description": "Trade Square Marketplace WhatsApp bot — Baileys + Gemini + shop catalogs",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test:directory": "node -e \"import('./src/shop-directory.js').then(d=>console.log(d.allPlaces().length, d.findPlace('barber')[0]?.name))\""
+    "test:marketplace": "node -e \"import('./src/menus.js').then(m=>{const a=m.parseMenuSelection('menu');const b=m.parseMenuSelection('1');const c=m.parseMenuSelection('dtf');const d=m.parseMenuSelection('about');console.log(a.type,b.type,b.shopId,c.type,c.productId,d.type);})\""
   },
   "engines": {
     "node": ">=20"
