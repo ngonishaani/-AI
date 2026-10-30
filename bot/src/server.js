@@ -14,11 +14,13 @@ import {
 } from "./catalog-store.js";
 import { getShops } from "./marketplace.js";
 import { textMainMenu } from "./menus.js";
+import { getSiteRoot, tryServeSite } from "./site-static.js";
 
 /**
- *   GET  /health /status /catalog /menu-preview / /qr /qr.png /pair
+ *   GET  /health /status /catalog /menu-preview /qr /qr.png /pair
  *   PUT  /catalog   (enrol page sync)
  *   POST /pair  /relink
+ *   GET  /*        mall website (index, /shop, /enroll, assets) from SITE_ROOT
  */
 export function startHttpServer({
   getStatus,
@@ -264,17 +266,14 @@ export function startHttpServer({
       });
     }
 
-    if (
-      (pathName === "/" || pathName === "/qr" || pathName === "/pair") &&
-      req.method === "GET"
-    ) {
+    if ((pathName === "/qr" || pathName === "/pair") && req.method === "GET") {
       const status = getStatus();
       const auth = getAuthInfo?.() || {};
       const qr = getLatestQr?.();
       const wantPhone =
         pathName === "/pair" || url.searchParams.get("mode") === "phone";
 
-      if (status === "open") {
+      if (status === "open" && pathName === "/qr") {
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
@@ -283,7 +282,8 @@ export function startHttpServer({
           page(
             "Trade Square WhatsApp bot",
             `<p class="ok">Connected. Message the linked WhatsApp number — the mall bot will reply.</p>
-             <p class="muted">Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO"}</strong></p>`
+             <p class="muted">Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO"}</strong></p>
+             <p class="muted"><a href="/">← Mall website</a> · <a href="/shop">Enrolled shops</a></p>`
           )
         );
         return;
@@ -400,12 +400,19 @@ export function startHttpServer({
       return;
     }
 
+    if (tryServeSite(req, res, pathName, logger)) {
+      return;
+    }
+
     res.writeHead(404, { "Content-Type": "text/plain" });
     res.end("Not found");
   });
 
   server.listen(port, "0.0.0.0", () => {
-    logger.info({ port }, "HTTP server listening (QR + /health)");
+    logger.info(
+      { port, siteRoot: getSiteRoot() },
+      "HTTP server listening (mall site + QR + /health)"
+    );
   });
 
   return server;

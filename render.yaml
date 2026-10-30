@@ -1,6 +1,8 @@
-# Trade Square Mall WhatsApp bot on Render (Baileys + cron + Gemini)
+# Trade Square Mall on Render
+# - Web service: WhatsApp bot + mall website (/, /shop, /enroll, assets)
+# - Catalog API: GET/PUT /catalog (same origin as the site)
 # Dashboard: New → Blueprint → connect this repo → apply render.yaml
-# Docs: bot/README.md  ·  Requires a paid plan for persistent disk + always-on
+# Docs: docs/render-deploy.md  ·  Requires a paid plan for persistent disk + always-on
 
 services:
   - type: web
@@ -8,9 +10,9 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    rootDir: bot
-    buildCommand: npm install
-    startCommand: npm start
+    # Repo root so the mall static site (index.html, shop/, assets/) is deployed
+    buildCommand: npm install --prefix bot
+    startCommand: npm start --prefix bot
     healthCheckPath: /health
     autoDeploy: true
     disk:
@@ -22,6 +24,8 @@ services:
         value: "20"
       - key: BAILEYS_AUTH_DIR
         value: /var/data/auth_info_baileys
+      - key: SITE_ROOT
+        value: /opt/render/project/src
       - key: LOG_LEVEL
         value: info
       - key: GEMINI_API_KEY
