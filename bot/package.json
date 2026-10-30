@@ -1,0 +1,25 @@
+{
+  "name": "trade-square-whatsapp-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Trade Square Marketplace WhatsApp bot — Baileys + Gemini + shop catalogs",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test:marketplace": "node -e \"import('./src/menus.js').then(m=>{const a=m.parseMenuSelection('menu');const b=m.parseMenuSelection('1');const c=m.parseMenuSelection('dtf');const d=m.parseMenuSelection('about');console.log(a.type,b.type,b.shopId,c.type,c.productId,d.type);})\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "dotenv": "^16.4.7",
+    "node-cron": "^4.6.0",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

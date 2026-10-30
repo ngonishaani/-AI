@@ -1,0 +1,34 @@
+# Trade Square Mall WhatsApp bot on Render (Baileys + cron + Gemini)
+# Dashboard: New → Blueprint → connect this repo → apply render.yaml
+# Docs: bot/README.md  ·  Requires a paid plan for persistent disk + always-on
+
+services:
+  - type: web
+    name: trade-square-whatsapp-bot
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: bot
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: baileys-auth
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: BAILEYS_AUTH_DIR
+        value: /var/data/auth_info_baileys
+      - key: LOG_LEVEL
+        value: info
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: BOT_ALLOW_GROUPS
+        value: "0"
+      - key: CATALOG_SYNC_TOKEN
+        sync: false

@@ -1,3 +1,13 @@
 .vercel
 node_modules
 .DS_Store
+.env
+.env.local
+.env*.local
+
+# Baileys WhatsApp bot
+bot/node_modules/
+bot/auth_info_baileys/
+bot/data/
+bot/.env
+bot/.env.local

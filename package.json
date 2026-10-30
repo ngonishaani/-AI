@@ -2,8 +2,10 @@
   "name": "trade-square-mall",
   "version": "1.0.0",
   "private": true,
-  "description": "Trade Square Mall · Kwekwe",
+  "description": "Trade Square Mall · Kwekwe — static site; WhatsApp bot lives in /bot (Baileys)",
   "scripts": {
-    "build": "echo 'static site — no build step'"
+    "build": "echo 'static site — no build step'",
+    "bot": "npm --prefix bot start",
+    "bot:install": "npm --prefix bot install"
   }
 }
