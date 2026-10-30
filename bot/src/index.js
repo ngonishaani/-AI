@@ -29,6 +29,7 @@ import {
   mainMenuList,
   parseMenuSelection,
   productCaption,
+  shopListLines,
   shopMenuList,
   shopSummary,
   textMainMenu,
@@ -137,22 +138,33 @@ async function sendImage(jid, url, caption) {
 }
 
 async function sendListOrText(jid, listPayload, textFallback) {
+  // Always send the numbered text list so shops/products are visible in chat.
+  // Interactive list is optional (many WhatsApp clients hide it behind a button).
+  await sock.sendMessage(jid, { text: textFallback });
   try {
     await sock.sendMessage(jid, listPayload);
     return true;
   } catch (err) {
     logger.warn(
       { err: err?.message || err },
-      "list menu unsupported — sending text menu"
+      "interactive list unsupported — text menu already sent"
     );
-    await sock.sendMessage(jid, { text: textFallback });
     return false;
   }
 }
 
 async function sendMainMenu(jid) {
   clearChatShop(jid);
-  await sendListOrText(jid, mainMenuList(), textMainMenu());
+  // Numbered shop list first — always readable; optional tap menu after.
+  await sock.sendMessage(jid, { text: textMainMenu() });
+  try {
+    await sock.sendMessage(jid, mainMenuList());
+  } catch (err) {
+    logger.warn(
+      { err: err?.message || err },
+      "interactive shop list skipped"
+    );
+  }
 }
 
 async function sendShopCard(jid, shop) {
@@ -270,9 +282,12 @@ async function handleIncoming(msg) {
     return;
   }
 
+  // Free-typed request — answer, then show shops so they can pick or keep typing
   const reply = await generateMallReply(text);
-  await sock.sendMessage(jid, { text: reply });
-  logger.info({ jid, chars: reply.length }, "gemini reply");
+  await sock.sendMessage(jid, {
+    text: `${reply}\n\n—\n*Shops*\n${shopListLines()}\n\nReply with a number, shop name, or type what you want.`,
+  });
+  logger.info({ jid, chars: reply.length }, "gemini reply + shop list");
 }
 
 async function connectToWhatsApp() {

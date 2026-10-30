@@ -176,9 +176,9 @@ export async function testGemini() {
 function marketplaceFallback(userText) {
   const q = String(userText || "").toLowerCase();
   if (/\b(about|mall|place|location|trade square)\b/.test(q)) {
-    return `*${PLACE_ABOUT.name}*\n${PLACE_ABOUT.about}\n📍 ${PLACE_ABOUT.address}\nReply *menu* to browse shops.`;
+    return `*${PLACE_ABOUT.name}*\n${PLACE_ABOUT.about}\n📍 ${PLACE_ABOUT.address}\nReply *menu* for the shop list.`;
   }
-  return `Browse the marketplace — reply *menu* to see shops (e.g. RoyaleApe Studios), products, and prices.\nOr tell me what you need (DTF, hoodies, gifts, banners, website).`;
+  return `I can help you browse marketplace shops.\n\nReply *menu* for the shop list, pick a number, or type what you want (DTF, hoodies, gifts, banners, website).`;
 }
 
 export async function generateMallReply(userText) {

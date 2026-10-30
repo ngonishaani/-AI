@@ -13,10 +13,10 @@ import {
 
 export function mainMenuList() {
   return {
-    text: `Welcome to *${MARKETPLACE.name}* 🛍️\n${MARKETPLACE.tagline}\n\nPick a shop to browse products & prices:`,
+    text: textMainMenu(),
     footer: "Trade Square Marketplace",
     title: "Shops",
-    buttonText: "Open menu",
+    buttonText: "View shops",
     sections: [
       {
         title: "Shops",
@@ -33,11 +33,6 @@ export function mainMenuList() {
             title: "About the mall",
             rowId: "about:place",
             description: "Trade Square Mall info",
-          },
-          {
-            title: "Main menu",
-            rowId: "menu:main",
-            description: "Back to shops",
           },
         ],
       },
@@ -84,11 +79,15 @@ export function shopMenuList(shop) {
   };
 }
 
+export function shopListLines() {
+  return SHOPS.map(
+    (s, i) =>
+      `${i + 1}. *${s.name}*\n   ${s.floor} · ${s.number}\n   ${s.categories?.slice(0, 3).join(" · ") || s.description.slice(0, 60)}`
+  ).join("\n\n");
+}
+
 export function textMainMenu() {
-  const lines = SHOPS.map(
-    (s, i) => `${i + 1}. *${s.name}* — ${s.floor}, ${s.number}`
-  ).join("\n");
-  return `Welcome to *${MARKETPLACE.name}* 🛍️\n${MARKETPLACE.tagline}\n\n*Shops*\n${lines}\n\nReply with a number, shop name, or *menu*.\nFor the mall itself, reply *about*.`;
+  return `Welcome to *${MARKETPLACE.name}* 🛍️\n${MARKETPLACE.tagline}\n\n*Shops*\n${shopListLines()}\n\n👉 Reply with a *number* or *shop name*\n👉 Or type what you want (e.g. DTF, hoodies, banners, website)\n👉 *about* = mall info`;
 }
 
 export function textShopMenu(shop) {
@@ -110,6 +109,37 @@ export function aboutPlaceText() {
   return `*${PLACE_ABOUT.name}*\n${PLACE_ABOUT.about}\n\n📍 ${PLACE_ABOUT.address}\n🗺 ${PLACE_ABOUT.mapsUrl}\n\n*Mall hours*\n${hours}\n\n🌐 ${PLACE_ABOUT.website}\n\nReply *menu* to browse marketplace shops.`;
 }
 
+/** Match typed need → product across all shops */
+function matchTypedNeed(lower) {
+  if (/\b(dtf|gang\s*sheets?|transfers?|heat\s*press)\b/i.test(lower)) {
+    return { type: "product", shopId: "royaleape", productId: "dtf-sheets" };
+  }
+  if (
+    /\b(hoodies?|t-?shirts?|tees?\b|polos?|apparel|clothing|jerseys?|uniforms?)\b/i.test(
+      lower
+    )
+  ) {
+    return { type: "product", shopId: "royaleape", productId: "custom-apparel" };
+  }
+  if (/\b(gifts?|bottles?|totes?|hampers?|merch)\b/i.test(lower)) {
+    return { type: "product", shopId: "royaleape", productId: "custom-gifts" };
+  }
+  if (/\b(business\s*cards?|flyers?|brochures?)\b/i.test(lower)) {
+    return { type: "shop", shopId: "royaleape" };
+  }
+  if (
+    /\b(banners?|vinyl|flex|canvas|large\s*format|signage|posters?|stickers?|prints?|printing)\b/i.test(
+      lower
+    )
+  ) {
+    return { type: "product", shopId: "royaleape", productId: "large-format" };
+  }
+  if (/\b(websites?|web\s*sites?|web\s*packages?|seo|hosting)\b/i.test(lower)) {
+    return { type: "product", shopId: "royaleape", productId: "web-packages" };
+  }
+  return null;
+}
+
 export function parseMenuSelection(text, { currentShopId } = {}) {
   const raw = String(text || "").trim();
   const lower = raw.toLowerCase();
@@ -129,7 +159,11 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
     return { type: raw.startsWith("about") ? "about" : "menu" };
   }
 
-  if (/^(menu|hi|hello|hey|start|shops?|marketplace|mhoro|masikati)\b/i.test(lower)) {
+  if (
+    /^(menu|hi|hello|hey|start|shops?|list|marketplace|mhoro|masikati|good\s*(morning|afternoon|evening)|howdy|sup)\b/i.test(
+      lower
+    )
+  ) {
     return { type: "menu" };
   }
   if (/^(about|mall|place|location|where is the mall|trade square)\b/i.test(lower)) {
@@ -155,50 +189,41 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
     return { type: "whatsapp", shopId: currentShopId };
   }
 
-  // Fuzzy shop name
-  const shopHit = SHOPS.find(
-    (s) =>
+  // Typed need (product / service) — works without picking a shop first
+  const need = matchTypedNeed(lower);
+  if (need) return need;
+
+  // Fuzzy shop name (typing the shop alone is enough)
+  const shopHit = SHOPS.find((s) => {
+    const name = s.name.toLowerCase();
+    return (
+      lower === s.id ||
+      lower === name ||
       lower.includes(s.id) ||
-      lower.includes(s.name.toLowerCase()) ||
+      lower.includes(name) ||
       lower.includes("royale ape") ||
       lower.includes("royaleape") ||
       /\broyale\b/.test(lower)
-  );
-  if (
-    shopHit &&
-    /shop|royale|print|store|studios/i.test(lower) &&
-    !/product|hoodie|dtf|shirt|gift|website|banner/i.test(lower)
-  ) {
+    );
+  });
+  if (shopHit) {
     return { type: "shop", shopId: shopHit.id };
   }
 
-  // Fuzzy product within current shop or all shops
-  const searchShops = currentShopId ? [getShop(currentShopId)].filter(Boolean) : SHOPS;
-  for (const shop of searchShops) {
+  // Fuzzy product name across current shop, then all shops
+  const searchOrder = [
+    ...(currentShopId ? [getShop(currentShopId)].filter(Boolean) : []),
+    ...SHOPS.filter((s) => s.id !== currentShopId),
+  ];
+  for (const shop of searchOrder) {
     const product = shop.products.find(
       (p) =>
+        lower.includes(p.id.replace(/-/g, " ")) ||
         lower.includes(p.id) ||
         lower.includes(p.name.toLowerCase()) ||
         p.variations.some((v) => lower.includes(v.name.toLowerCase()))
     );
     if (product) return { type: "product", shopId: shop.id, productId: product.id };
-  }
-
-  // Common product keywords
-  if (/\b(dtf|gang\s*sheet|transfer)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "dtf-sheets" };
-  }
-  if (/\b(hoodie|t-?shirt|polo|apparel|clothing)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "custom-apparel" };
-  }
-  if (/\b(gift|bottle|tote|hamper|merch)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "custom-gifts" };
-  }
-  if (/\b(banner|vinyl|flex|canvas|large\s*format)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "large-format" };
-  }
-  if (/\b(website|web\s*package|seo)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "web-packages" };
   }
 
   return { type: "chat", text: raw };
