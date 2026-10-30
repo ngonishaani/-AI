@@ -15,7 +15,31 @@
       "destination": "/enrol/index.html"
     },
     {
-      "source": "/((?!assets/|enroll/|enrol/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg|enroll\\.html).*)",
+      "source": "/shop",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/shops",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/shops/(.*)",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/dine",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/visit",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/events",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }
   ],
