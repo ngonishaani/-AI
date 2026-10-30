@@ -277,7 +277,6 @@ httpServer = startHttpServer({
   getSock,
   getAuthInfo,
   getLatestQr,
-  getPairingState,
   forceRelink,
   logger,
   isGeminiConfigured,
