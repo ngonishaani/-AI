@@ -7,7 +7,15 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/((?!assets/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/enroll",
+      "destination": "/enroll/index.html"
+    },
+    {
+      "source": "/enrol",
+      "destination": "/enrol/index.html"
+    },
+    {
+      "source": "/((?!assets/|enroll/|enrol/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg|enroll\\.html).*)",
       "destination": "/index.html"
     }
   ],
