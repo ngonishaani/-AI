@@ -2,107 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Enrolled shops open now at Trade Square Mall, Kwekwe."
-    />
-    <meta name="theme-color" content="#004741" />
-    <meta name="tsm-catalog-url" content="https://ai-mallbot.onrender.com/catalog" />
+    <meta http-equiv="refresh" content="0; url=/shop" />
+    <link rel="canonical" href="/shop" />
     <title>Enrolled shops · Trade Square Mall</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/assets/index-1c19cfd8.css" />
-    <link rel="stylesheet" href="/assets/shops.css" />
+    <script>
+      location.replace("/shop" + location.hash);
+    </script>
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-
-    <header class="nav nav--light" id="site-nav">
-      <div class="nav-inner">
-        <a class="logo logo-link" href="/" aria-label="Trade Square Mall home">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <circle class="mark-outer" cx="16" cy="16" r="12" />
-            <circle class="mark-inner" cx="16" cy="16" r="7" />
-            <circle class="mark-core" cx="16" cy="16" r="2.5" />
-          </svg>
-          Trade Square
-        </a>
-        <nav class="nav-links" aria-label="Primary">
-          <a href="/shop">Shop</a>
-          <a href="/shops/" aria-current="page">Open now</a>
-          <a href="/dine">Dine</a>
-          <a href="/events">Events</a>
-          <a href="/visit">Visit</a>
-          <a href="/enroll/">Enrol</a>
-        </nav>
-        <div class="nav-actions">
-          <a class="btn btn--small" href="/enroll/">Enrol a shop</a>
-          <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" id="menu-toggle">
-            Menu
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <div class="menu" id="mobile-menu" hidden>
-      <nav aria-label="Mobile">
-        <a href="/shop">Shop</a>
-        <a href="/shops/" aria-current="page">Open now</a>
-        <a href="/dine">Dine</a>
-        <a href="/events">Events</a>
-        <a href="/visit">Visit</a>
-        <a href="/enroll/">Enrol</a>
-      </nav>
-    </div>
-
-    <main id="main" class="main--offset shops-page">
-      <section id="shops-list" class="wrap">
-        <header class="shops-page__head">
-          <p class="kicker">Trade Square Mall · Kwekwe</p>
-          <h1>Enrolled shops</h1>
-          <p class="shops-page__dek">
-            Live tenants enrolled at Trade Square — floor, unit, products, and WhatsApp.
-          </p>
-        </header>
-
-        <div class="shops-toolbar">
-          <p class="shops-toolbar__count" id="shops-count">0 shops</p>
-          <label class="sr-only" for="shops-search">Search shops</label>
-          <input id="shops-search" type="search" placeholder="Search shops" />
-        </div>
-
-        <p id="shops-status" class="shops-status" role="status" aria-live="polite"></p>
-        <div class="card-grid" id="shops-grid"></div>
-        <p class="shops-empty" id="shops-empty" hidden>
-          No enrolled shops match that search.
-          <a href="/enroll/">Enrol a shop</a> to appear here.
-        </p>
-      </section>
-
-      <section id="shops-detail" class="shops-detail" hidden></section>
-    </main>
-
-    <footer class="footer">
-      <div class="wrap footer-grid">
-        <div>
-          <a class="logo logo-link" href="/">Trade Square</a>
-          <p class="footer-address">Trade Square Mall, Kwekwe, Zimbabwe</p>
-        </div>
-        <ul>
-          <li><a href="/shop">Shop</a></li>
-          <li><a href="/shops/">Open now</a></li>
-          <li><a href="/enroll/">Enrol a shop</a></li>
-          <li><a href="/visit">Visit</a></li>
-        </ul>
-      </div>
-    </footer>
-
-    <script src="/assets/shops-page.js" defer></script>
+    <p><a href="/shop">Continue to enrolled shops</a></p>
   </body>
 </html>

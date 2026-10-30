@@ -77,7 +77,16 @@
   }
 
   function selectedId() {
+    const params = new URLSearchParams(location.search);
+    const fromQuery = String(params.get("shop") || params.get("id") || "").trim();
+    if (fromQuery) return fromQuery;
     return decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  }
+
+  function cleanShopUrl(id) {
+    const next = id ? `${location.pathname}#${encodeURIComponent(id)}` : location.pathname;
+    if (`${location.pathname}${location.search}${location.hash}` === next) return;
+    history.replaceState(null, "", next);
   }
 
   function cardHtml(shop) {
@@ -207,16 +216,18 @@
     const shop = id ? shops.find((s) => s.id === id) : null;
     if (id && !shop) {
       statusEl.textContent = "That shop was not found in the enrolled directory.";
-      history.replaceState(null, "", location.pathname);
+      cleanShopUrl("");
       renderDetail(null);
       renderList();
       return;
     }
     statusEl.textContent = "";
     if (shop) {
+      cleanShopUrl(shop.id);
       renderDetail(shop);
     } else {
       document.title = "Enrolled shops · Trade Square Mall";
+      cleanShopUrl("");
       renderDetail(null);
       renderList();
     }
