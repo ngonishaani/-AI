@@ -144,7 +144,7 @@
     detailEl.innerHTML = `
       <div class="wrap">
         <p class="shops-detail__back">
-          <a class="text-link" href="#"><span aria-hidden="true">←</span> All enrolled shops</a>
+          <a class="text-link" href="/shop"><span aria-hidden="true">←</span> All enrolled shops</a>
         </p>
         <header class="place-head">
           <p class="kicker">${escapeHtml(categoryFor(shop))}</p>
