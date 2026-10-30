@@ -1,7 +1,9 @@
 /**
  * Marketplace catalog — shops with products, prices, images, WhatsApp links.
- * Sample shop: RoyaleApe Studios (scraped from royaleape.com).
+ * Seed shop: RoyaleApe Studios. Enrolled shops from /enroll sync via catalog-store.
  */
+
+import { listNormalizedEnrolled } from "./catalog-store.js";
 
 export const MARKETPLACE = {
   name: "Trade Square Marketplace",
@@ -27,7 +29,8 @@ export const PLACE_ABOUT = {
   ],
 };
 
-export const SHOPS = [
+/** Built-in sample catalog (kept when enrolment is empty). */
+export const SEED_SHOPS = [
   {
     id: "royaleape",
     name: "RoyaleApe Studios",
@@ -145,8 +148,31 @@ export const SHOPS = [
   },
 ];
 
+/** @deprecated Prefer getShops() — live merge of seed + enrolled. */
+export const SHOPS = SEED_SHOPS;
+
+/**
+ * Live marketplace list: seed shops, overridden/extended by /enroll sync.
+ */
+export function getShops() {
+  const enrolled = listNormalizedEnrolled();
+  if (!enrolled.length) return SEED_SHOPS.map((s) => ({ ...s }));
+
+  const byId = new Map(SEED_SHOPS.map((s) => [s.id, s]));
+  for (const shop of enrolled) {
+    byId.set(shop.id, shop);
+  }
+
+  const seedIds = new Set(SEED_SHOPS.map((s) => s.id));
+  const merged = SEED_SHOPS.map((s) => byId.get(s.id));
+  for (const shop of enrolled) {
+    if (!seedIds.has(shop.id)) merged.push(shop);
+  }
+  return merged;
+}
+
 export function getShop(id) {
-  return SHOPS.find((s) => s.id === id) || null;
+  return getShops().find((s) => s.id === id) || null;
 }
 
 export function getProduct(shopId, productId) {
@@ -162,12 +188,17 @@ export function formatMoney(amount, currency = "USD") {
   return `${currency} ${amount}`;
 }
 
+function shopChatLine(shop) {
+  return shop.whatsapp || shop.link || "Ask at the mall";
+}
+
 export function shopSummary(shop) {
-  return `*${shop.name}*\n📍 ${shop.floor} · ${shop.number}\n${shop.description}\n🌐 ${shop.link}\n💬 Chat store: ${shop.whatsapp}`;
+  return `*${shop.name}*\n📍 ${shop.floor} · ${shop.number}\n${shop.description}\n🌐 ${shop.link}\n💬 Chat store: ${shopChatLine(shop)}`;
 }
 
 export function productCaption(shop, product) {
-  const vars = product.variations
+  const variations = Array.isArray(product.variations) ? product.variations : [];
+  const vars = variations
     .map((v) => {
       const priceLabel =
         v.price != null
@@ -176,28 +207,30 @@ export function productCaption(shop, product) {
       return `• ${v.name}: ${priceLabel}${v.note ? ` (${v.note})` : ""}`;
     })
     .join("\n");
-  return `*${product.name}*\n${product.description}\n\n*Prices / options*\n${vars}\n\nOrder / chat with ${shop.name}:\n${shop.whatsapp}\n${product.link}`;
+  return `*${product.name}*\n${product.description}\n\n*Prices / options*\n${vars || "• Ask the shop for a quote"}\n\nOrder / chat with ${shop.name}:\n${shopChatLine(shop)}\n${product.link || ""}`;
 }
 
 export function buildMarketplaceContext() {
-  const lines = SHOPS.map((shop) => {
+  const lines = getShops().map((shop) => {
     const products = shop.products
       .map((p) => {
-        const vars = p.variations
+        const variations = Array.isArray(p.variations) ? p.variations : [];
+        const vars = variations
           .map((v) => `${v.name} ${formatMoney(v.price, v.currency)}${v.note ? ` (${v.note})` : ""}`)
           .join("; ");
         return `  - ${p.name}: ${p.description} Prices: ${vars}. Image: ${p.image}. Link: ${p.link}`;
       })
       .join("\n");
+    const services = Array.isArray(shop.services) ? shop.services.join(", ") : "";
     return `SHOP ${shop.name}
 Floor: ${shop.floor}
 Number: ${shop.number}
 Image: ${shop.image}
 Description: ${shop.description}
 Link: ${shop.link}
-WhatsApp: ${shop.whatsapp}
+WhatsApp: ${shopChatLine(shop)}
 Hours: ${shop.hours}
-Services: ${shop.services.join(", ")}
+Services: ${services}
 Products:
 ${products}`;
   }).join("\n\n");

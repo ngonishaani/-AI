@@ -74,4 +74,5 @@ pm2 save
 - Groups are ignored unless `BOT_ALLOW_GROUPS=1`.
 - Without `GEMINI_API_KEY`, marketplace menus still work (shops, products, prices, store WhatsApp links).
 - Sample shop catalog: RoyaleApe Studios from [royaleape.com](https://royaleape.com/) (Shop 55).
+- Enrolments from [tradesquaremall.com/enroll](https://www.tradesquaremall.com/enroll/) sync to `PUT /catalog` and merge into the live shop list (`GET /catalog`, `GET /status` → `liveShopCount`).
 - Do not commit `auth_info_baileys/` or `.env`.

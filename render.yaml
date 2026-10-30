@@ -30,3 +30,5 @@ services:
         value: gemini-3.8-flash
       - key: BOT_ALLOW_GROUPS
         value: "0"
+      - key: CATALOG_SYNC_TOKEN
+        sync: false

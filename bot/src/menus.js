@@ -1,5 +1,5 @@
 import {
-  SHOPS,
+  getShops,
   getShop,
   getProduct,
   shopSummary,
@@ -12,6 +12,7 @@ import {
 /** Interactive list + text fallback menus for WhatsApp. */
 
 export function mainMenuList() {
+  const shops = getShops();
   return {
     text: textMainMenu(),
     footer: "Trade Square Marketplace",
@@ -20,7 +21,7 @@ export function mainMenuList() {
     sections: [
       {
         title: "Shops",
-        rows: SHOPS.map((s) => ({
+        rows: shops.map((s) => ({
           title: s.name.slice(0, 24),
           rowId: `shop:${s.id}`,
           description: `${s.floor} · ${s.number}`.slice(0, 72),
@@ -50,7 +51,7 @@ export function shopMenuList(shop) {
       {
         title: "Products & services",
         rows: shop.products.map((p) => {
-          const priced = p.variations.find((v) => v.price != null);
+          const priced = (p.variations || []).find((v) => v.price != null);
           return {
             title: p.name.slice(0, 24),
             rowId: `product:${shop.id}:${p.id}`,
@@ -80,10 +81,12 @@ export function shopMenuList(shop) {
 }
 
 export function shopListLines() {
-  return SHOPS.map(
-    (s, i) =>
-      `${i + 1}. *${s.name}*\n   ${s.floor} · ${s.number}\n   ${s.categories?.slice(0, 3).join(" · ") || s.description.slice(0, 60)}`
-  ).join("\n\n");
+  return getShops()
+    .map(
+      (s, i) =>
+        `${i + 1}. *${s.name}*\n   ${s.floor} · ${s.number}\n   ${s.categories?.slice(0, 3).join(" · ") || s.description.slice(0, 60)}`
+    )
+    .join("\n\n");
 }
 
 export function textMainMenu() {
@@ -93,7 +96,7 @@ export function textMainMenu() {
 export function textShopMenu(shop) {
   const lines = shop.products
     .map((p, i) => {
-      const priced = p.variations.find((v) => v.price != null);
+      const priced = (p.variations || []).find((v) => v.price != null);
       return `${i + 1}. *${p.name}* — ${
         priced ? `from ${formatMoney(priced.price, priced.currency)}` : "quote on WhatsApp"
       }`;
@@ -179,10 +182,12 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
     }
   }
 
+  const shops = getShops();
+
   // Number on main menu → shop
   if (/^\d+$/.test(raw)) {
     const idx = Number(raw) - 1;
-    if (SHOPS[idx]) return { type: "shop", shopId: SHOPS[idx].id };
+    if (shops[idx]) return { type: "shop", shopId: shops[idx].id };
   }
 
   if (/^(chat|whatsapp|order)\b/i.test(lower) && currentShopId) {
@@ -194,16 +199,17 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
   if (need) return need;
 
   // Fuzzy shop name (typing the shop alone is enough)
-  const shopHit = SHOPS.find((s) => {
+  const shopHit = shops.find((s) => {
     const name = s.name.toLowerCase();
     return (
       lower === s.id ||
       lower === name ||
       lower.includes(s.id) ||
       lower.includes(name) ||
-      lower.includes("royale ape") ||
-      lower.includes("royaleape") ||
-      /\broyale\b/.test(lower)
+      (s.id === "royaleape" &&
+        (lower.includes("royale ape") ||
+          lower.includes("royaleape") ||
+          /\broyale\b/.test(lower)))
     );
   });
   if (shopHit) {
@@ -213,7 +219,7 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
   // Fuzzy product name across current shop, then all shops
   const searchOrder = [
     ...(currentShopId ? [getShop(currentShopId)].filter(Boolean) : []),
-    ...SHOPS.filter((s) => s.id !== currentShopId),
+    ...shops.filter((s) => s.id !== currentShopId),
   ];
   for (const shop of searchOrder) {
     const product = shop.products.find(
@@ -221,7 +227,8 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
         lower.includes(p.id.replace(/-/g, " ")) ||
         lower.includes(p.id) ||
         lower.includes(p.name.toLowerCase()) ||
-        p.variations.some((v) => lower.includes(v.name.toLowerCase()))
+        (Array.isArray(p.variations) &&
+          p.variations.some((v) => lower.includes(String(v.name || "").toLowerCase())))
     );
     if (product) return { type: "product", shopId: shop.id, productId: product.id };
   }

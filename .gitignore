@@ -8,5 +8,6 @@ node_modules
 # Baileys WhatsApp bot
 bot/node_modules/
 bot/auth_info_baileys/
+bot/data/
 bot/.env
 bot/.env.local

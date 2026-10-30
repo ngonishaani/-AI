@@ -6,9 +6,17 @@ import {
   maybeRequestPairingCode,
 } from "./pairing.js";
 import { getGeminiDiagnostics, testGemini } from "./gemini.js";
+import {
+  getCatalogMeta,
+  loadEnrolledRaw,
+  saveEnrolledRaw,
+  listNormalizedEnrolled,
+} from "./catalog-store.js";
+import { getShops } from "./marketplace.js";
 
 /**
- *   GET  /health /status / /qr /qr.png /pair
+ *   GET  /health /status /catalog / /qr /qr.png /pair
+ *   PUT  /catalog   (enrol page sync)
  *   POST /pair  /relink
  */
 export function startHttpServer({
@@ -26,10 +34,74 @@ export function startHttpServer({
     const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
     const pathName = url.pathname;
 
+    if (req.method === "OPTIONS" && pathName.startsWith("/catalog")) {
+      return sendCors(res, 204, "");
+    }
+
     if (pathName === "/health") {
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("ok");
       return;
+    }
+
+    if (pathName === "/catalog" && req.method === "GET") {
+      const enrolled = loadEnrolledRaw();
+      const meta = getCatalogMeta();
+      return sendCorsJson(res, 200, {
+        ok: true,
+        shops: enrolled.shops,
+        normalized: listNormalizedEnrolled(),
+        live: getShops().map((s) => ({
+          id: s.id,
+          name: s.name,
+          floor: s.floor,
+          number: s.number,
+          enrolled: Boolean(s.enrolled),
+          productCount: s.products?.length || 0,
+        })),
+        updatedAt: meta.updatedAt,
+        count: meta.count,
+      });
+    }
+
+    if (pathName === "/catalog" && (req.method === "PUT" || req.method === "POST")) {
+      if (!authorizeCatalogWrite(req)) {
+        return sendCorsJson(res, 401, {
+          ok: false,
+          error: "Unauthorized — set CATALOG_SYNC_TOKEN on the bot and enrol page",
+        });
+      }
+      try {
+        const body = await readBody(req);
+        const shops = Array.isArray(body?.shops)
+          ? body.shops
+          : Array.isArray(body)
+            ? body
+            : null;
+        if (!shops) {
+          return sendCorsJson(res, 400, {
+            ok: false,
+            error: "Expected JSON body { shops: [...] }",
+          });
+        }
+        const saved = saveEnrolledRaw(shops);
+        logger.info(
+          { count: saved.shops.length, updatedAt: saved.updatedAt },
+          "Marketplace catalog updated from enrol sync"
+        );
+        return sendCorsJson(res, 200, {
+          ok: true,
+          count: saved.shops.length,
+          updatedAt: saved.updatedAt,
+          liveCount: getShops().length,
+        });
+      } catch (err) {
+        logger.error({ err: err?.message || err }, "catalog sync failed");
+        return sendCorsJson(res, 500, {
+          ok: false,
+          error: err?.message || String(err),
+        });
+      }
     }
 
     if (pathName === "/status") {
@@ -37,6 +109,7 @@ export function startHttpServer({
       const auth = getAuthInfo?.() || {};
       const qr = getLatestQr?.();
       const gemini = getGeminiDiagnostics();
+      const catalog = getCatalogMeta();
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
@@ -56,6 +129,9 @@ export function startHttpServer({
           renderDiskMounted: Boolean(auth.renderDiskMounted),
           sessionRegistered: Boolean(auth.sessionRegistered),
           authFileCount: auth.authFileCount || 0,
+          catalogCount: catalog.count,
+          catalogUpdatedAt: catalog.updatedAt,
+          liveShopCount: getShops().length,
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,
@@ -313,6 +389,42 @@ export function startHttpServer({
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Catalog-Token",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+function sendCors(res, code, body) {
+  res.writeHead(code, {
+    ...corsHeaders(),
+    "Content-Type": "text/plain",
+    "Cache-Control": "no-store",
+  });
+  res.end(body);
+}
+
+function sendCorsJson(res, code, obj) {
+  res.writeHead(code, {
+    ...corsHeaders(),
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  });
+  res.end(JSON.stringify(obj));
+}
+
+function authorizeCatalogWrite(req) {
+  const expected = process.env.CATALOG_SYNC_TOKEN?.trim();
+  if (!expected) return true;
+  const header = req.headers.authorization || "";
+  const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const alt = String(req.headers["x-catalog-token"] || "").trim();
+  return bearer === expected || alt === expected;
 }
 
 function sendJson(res, code, obj) {

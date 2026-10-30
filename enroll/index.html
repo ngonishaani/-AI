@@ -8,6 +8,7 @@
       content="Enrol your shop and products at Trade Square Mall, Kwekwe."
     />
     <meta name="theme-color" content="#004741" />
+    <meta name="tsm-catalog-url" content="https://ai-mallbot.onrender.com/catalog" />
     <title>Enrol a shop · Trade Square Mall</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -149,9 +150,10 @@
             <p class="kicker">Directory</p>
             <h2>Enrolled shops</h2>
             <p class="enrol-aside__dek">
-              Shops saved on this device. Export JSON to share with the mall team or WhatsApp marketplace.
+              Shops save here and update the WhatsApp marketplace bot automatically.
             </p>
             <div class="enrol-aside__actions">
+              <button class="btn btn--small btn--line" type="button" id="sync-bot">Sync to bot</button>
               <button class="btn btn--small btn--line" type="button" id="export-json">Export JSON</button>
               <button class="text-button" type="button" id="clear-all">Clear all</button>
             </div>
@@ -199,7 +201,7 @@
       </div>
       <div class="wrap footer-base">
         <span>© Trade Square Mall · Kwekwe</span>
-        <span>Enrolment saves to this browser until you export or clear.</span>
+        <span>Enrolment syncs to the WhatsApp marketplace bot.</span>
       </div>
     </footer>
 

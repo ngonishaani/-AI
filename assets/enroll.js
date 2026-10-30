@@ -1,6 +1,12 @@
 (() => {
   const STORAGE_KEY = "tsm-enrolled-shops";
   const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+  const CATALOG_URL =
+    document.querySelector('meta[name="tsm-catalog-url"]')?.content?.trim() ||
+    "https://ai-mallbot.onrender.com/catalog";
+  const CATALOG_TOKEN =
+    document.querySelector('meta[name="tsm-catalog-token"]')?.content?.trim() ||
+    "";
 
   const form = document.getElementById("enrol-form");
   const productList = document.getElementById("product-list");
@@ -28,6 +34,55 @@
 
   function saveShops(shops) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(shops));
+  }
+
+  async function syncCatalogToBot(shops) {
+    if (!CATALOG_URL) return { ok: false, skipped: true };
+    const headers = { "Content-Type": "application/json" };
+    if (CATALOG_TOKEN) {
+      headers.Authorization = `Bearer ${CATALOG_TOKEN}`;
+      headers["X-Catalog-Token"] = CATALOG_TOKEN;
+    }
+    return fetch(CATALOG_URL, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ shops }),
+    })
+      .then(async (res) => {
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+        if (!res.ok) {
+          throw new Error(data?.error || `Bot sync failed (${res.status})`);
+        }
+        return { ok: true, data };
+      })
+      .catch((err) => ({ ok: false, error: err?.message || String(err) }));
+  }
+
+  async function saveShopsAndConfirm(shops, successMessage) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(shops));
+    renderEnrolled();
+    setStatus(`${successMessage} Syncing to WhatsApp bot…`);
+    const result = await syncCatalogToBot(shops);
+    if (result.ok) {
+      const live = result.data?.liveCount;
+      setStatus(
+        live != null
+          ? `${successMessage} Updated on WhatsApp bot (${live} shop${live === 1 ? "" : "s"} live).`
+          : `${successMessage} Updated on WhatsApp bot.`
+      );
+    } else if (!result.skipped) {
+      setStatus(
+        `${successMessage} Saved here, but bot sync failed: ${result.error}`,
+        true
+      );
+    } else {
+      setStatus(successMessage);
+    }
   }
 
   function slugify(value) {
@@ -215,10 +270,8 @@
       ? shops.map((shop) => (shop.id === editingId ? payload : shop))
       : [payload, ...shops];
 
-    saveShops(next);
-    renderEnrolled();
     resetFormState();
-    setStatus(`${payload.name} saved to the enrolment directory.`);
+    saveShopsAndConfirm(next, `${payload.name} saved.`);
   });
 
   form.addEventListener("reset", (event) => {
@@ -277,10 +330,8 @@
     }
     if (deleteId) {
       const shops = loadShops().filter((item) => item.id !== deleteId);
-      saveShops(shops);
-      renderEnrolled();
       if (editingId === deleteId) resetFormState();
-      setStatus("Shop removed.");
+      saveShopsAndConfirm(shops, "Shop removed.");
     }
   });
 
@@ -304,11 +355,25 @@
 
   document.getElementById("clear-all").addEventListener("click", () => {
     if (!loadShops().length) return;
-    if (!window.confirm("Clear all enrolled shops from this browser?")) return;
-    saveShops([]);
-    renderEnrolled();
+    if (!window.confirm("Clear all enrolled shops from this browser and the WhatsApp bot?")) return;
     resetFormState();
-    setStatus("All enrolments cleared.");
+    saveShopsAndConfirm([], "All enrolments cleared.");
+  });
+
+  document.getElementById("sync-bot")?.addEventListener("click", async () => {
+    const shops = loadShops();
+    setStatus("Syncing enrolled shops to WhatsApp bot…");
+    const result = await syncCatalogToBot(shops);
+    if (result.ok) {
+      const live = result.data?.liveCount;
+      setStatus(
+        live != null
+          ? `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} · ${live} live on bot.`
+          : `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} to the bot.`
+      );
+    } else {
+      setStatus(`Bot sync failed: ${result.error}`, true);
+    }
   });
 
   menuToggle?.addEventListener("click", () => {
