@@ -15,7 +15,11 @@
       "destination": "/enrol/index.html"
     },
     {
-      "source": "/((?!assets/|enroll/|enrol/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg|enroll\\.html).*)",
+      "source": "/shops",
+      "destination": "/shops/index.html"
+    },
+    {
+      "source": "/((?!assets/|enroll/|enrol/|shops/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg|enroll\\.html).*)",
       "destination": "/index.html"
     }
   ],
