@@ -33,6 +33,7 @@ import {
   shopSummary,
   textMainMenu,
   textShopMenu,
+  whatsappLinkText,
 } from "./menus.js";
 
 const logger = pino({
@@ -184,14 +185,19 @@ async function sendProductCard(jid, shop, product) {
     await sock.sendMessage(jid, { text: caption });
   }
   await sock.sendMessage(jid, {
-    text: `Reply *chat* to WhatsApp ${shop.name}, a number for another product, or *menu* for all shops.`,
+    text: [
+      "*Next*",
+      `• *chat* — WhatsApp ${shop.name}`,
+      "• Reply with a *number* for another product",
+      "• *menu* — all shops",
+    ].join("\n"),
   });
 }
 
 async function sendWhatsAppLink(jid, shop) {
   setChatShop(jid, shop.id);
   await sock.sendMessage(jid, {
-    text: `Chat with *${shop.name}* on WhatsApp:\n${shop.whatsapp}\n\nTell them what you need (size, quantity, deadline). Reply *menu* anytime.`,
+    text: whatsappLinkText(shop),
   });
 }
 

@@ -183,31 +183,106 @@ export function getProduct(shopId, productId) {
 }
 
 export function formatMoney(amount, currency = "USD") {
-  if (amount == null || Number.isNaN(Number(amount))) return "Quote on WhatsApp";
-  if (currency === "USD") return `US$${Number(amount).toFixed(Number(amount) % 1 ? 2 : 0)}`;
-  return `${currency} ${amount}`;
+  if (amount == null || amount === "" || Number.isNaN(Number(amount))) {
+    return "Quote on WhatsApp";
+  }
+  const n = Number(amount);
+  // Enrol forms sometimes send 0 for “ask us”
+  if (n === 0) return "Quote on WhatsApp";
+  if (currency === "USD") return `US$${n.toFixed(n % 1 ? 2 : 0)}`;
+  return `${currency} ${n}`;
+}
+
+/** Collapse enrolment paste (newlines / bullets) into clean WhatsApp text. */
+export function cleanText(value, { max = 280 } = {}) {
+  const text = String(value || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+export function shopTags(shop, limit = 3) {
+  const cats = Array.isArray(shop.categories)
+    ? shop.categories.map((c) => String(c || "").trim()).filter(Boolean)
+    : [];
+  if (cats.length) return cats.slice(0, limit).join(" · ");
+  const oneLine = cleanText(shop.description, { max: 72 }).replace(/\n/g, " · ");
+  return oneLine || "Trade Square shop";
 }
 
 function shopChatLine(shop) {
   return shop.whatsapp || shop.link || "Ask at the mall";
 }
 
+export function shopLocationLine(shop) {
+  const floor = String(shop.floor || "").trim();
+  const number = String(shop.number || "").trim();
+  if (floor && number && number !== "—") return `${floor} · ${number}`;
+  return floor || number || "Trade Square Mall";
+}
+
+export function shopBlurb(shop, max = 180) {
+  const raw = String(shop.description || "");
+  const bulletHeavy = (raw.match(/[•\n]/g) || []).length > 6;
+  if (bulletHeavy) {
+    const tags = shopTags(shop, 8);
+    if (tags && tags !== "Trade Square shop") return tags;
+  }
+  return cleanText(raw, { max });
+}
+
 export function shopSummary(shop) {
-  return `*${shop.name}*\n📍 ${shop.floor} · ${shop.number}\n${shop.description}\n🌐 ${shop.link}\n💬 Chat store: ${shopChatLine(shop)}`;
+  const desc = shopBlurb(shop, 180);
+  const link = String(shop.link || "").trim();
+  const chat = shopChatLine(shop);
+  const lines = [
+    `*${shop.name}*`,
+    `📍 ${shopLocationLine(shop)}`,
+  ];
+  if (desc) lines.push("", desc);
+  lines.push("");
+  if (link && link !== chat) lines.push(`🌐 ${link}`);
+  lines.push(`💬 ${chat}`);
+  if (shop.hours && shop.hours !== "Mall hours") {
+    lines.push(`🕒 ${shop.hours}`);
+  }
+  return lines.join("\n");
 }
 
 export function productCaption(shop, product) {
   const variations = Array.isArray(product.variations) ? product.variations : [];
+  const desc = cleanText(product.description || product.name, { max: 220 });
   const vars = variations
     .map((v) => {
-      const priceLabel =
-        v.price != null
-          ? `*${formatMoney(v.price, v.currency)}*`
-          : "*Quote on WhatsApp*";
-      return `• ${v.name}: ${priceLabel}${v.note ? ` (${v.note})` : ""}`;
+      const priceLabel = formatMoney(v.price, v.currency);
+      const priced = priceLabel !== "Quote on WhatsApp";
+      const label = priced ? `*${priceLabel}*` : "_Quote on WhatsApp_";
+      const noteRaw = cleanText(v.note, { max: 60 });
+      const note =
+        noteRaw && !/quote on whatsapp/i.test(noteRaw) ? ` — ${noteRaw}` : "";
+      return `• ${v.name}: ${label}${note}`;
     })
     .join("\n");
-  return `*${product.name}*\n${product.description}\n\n*Prices / options*\n${vars || "• Ask the shop for a quote"}\n\nOrder / chat with ${shop.name}:\n${shopChatLine(shop)}\n${product.link || ""}`;
+
+  const lines = [
+    `*${product.name}*`,
+    `at *${shop.name}* · ${shopLocationLine(shop)}`,
+    "",
+    desc,
+    "",
+    "*Prices / options*",
+    vars || "• Ask the shop for a quote",
+    "",
+    `💬 Order via ${shop.name}:`,
+    shopChatLine(shop),
+  ];
+  if (product.link) lines.push(`🔗 ${product.link}`);
+  return lines.join("\n");
 }
 
 export function buildMarketplaceContext() {
@@ -251,5 +326,7 @@ Known shop ids for ACTION lines: ${getShops().map((s) => s.id).join(", ")}
 When showing a product card, prefer ACTION product:<shopId>:<productId> using ids from the catalog below.
 
 MARKETPLACE SHOPS:
-${lines}`;
+${lines}
+
+Reply style: warm, short, well-spaced WhatsApp messages; English/Shona mix OK. Use clear headings, short bullets, and blank lines. Prefer guiding users through shops → products → prices over dumping long lists.`;
 }
