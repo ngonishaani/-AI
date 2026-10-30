@@ -8,12 +8,15 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
-import qrcodeTerminal from "qrcode-terminal";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateMallReply } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
+import {
+  clearPairingCode,
+  maybeRequestPairingCode,
+} from "./pairing.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR =
@@ -28,7 +31,6 @@ const logger = pino({
 
 let sock = null;
 let connectionStatus = "close";
-let latestQr = null;
 let reconnecting = false;
 let stopCron = null;
 let httpServer = null;
@@ -116,14 +118,16 @@ async function connectToWhatsApp() {
 
     sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", (update) => {
+    sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
-        latestQr = qr;
-        console.log("\nScan this QR with WhatsApp → Linked Devices:\n");
-        console.log(`Or open https://YOUR-RENDER-URL/qr\n`);
-        qrcodeTerminal.generate(qr, { small: true });
+      // Pairing-code mode: when WhatsApp emits QR readiness, request code instead.
+      if (qr || connection === "connecting") {
+        try {
+          await maybeRequestPairingCode(sock, { logger });
+        } catch (err) {
+          logger.warn({ err: err?.message || err }, "pairing request skipped");
+        }
       }
 
       if (connection) {
@@ -132,7 +136,7 @@ async function connectToWhatsApp() {
       }
 
       if (connection === "open") {
-        latestQr = null;
+        clearPairingCode();
         logger.info("WhatsApp connected — Trade Square Mall bot is live");
       }
 
@@ -158,9 +162,9 @@ async function connectToWhatsApp() {
           }, delay);
           return;
         }
-        latestQr = null;
+        clearPairingCode();
         logger.error(
-          "Logged out — clear auth on the Render disk and scan a new QR"
+          "Logged out — clear auth on the Render disk and pair again"
         );
       }
     });
@@ -199,15 +203,12 @@ function getSock() {
 function getStatus() {
   return connectionStatus;
 }
-function getLatestQr() {
-  return latestQr;
-}
 async function reconnect() {
   if (connectionStatus === "open" && sock) return;
   await connectToWhatsApp();
 }
 
-httpServer = startHttpServer({ getStatus, getLatestQr, logger });
+httpServer = startHttpServer({ getStatus, getSock, logger });
 await connectToWhatsApp();
 stopCron = startCronJobs({
   getSock,

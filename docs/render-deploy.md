@@ -25,14 +25,16 @@ The Blueprint already sets:
 - `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`
 - health check: `/health`
 
-## 3. Link WhatsApp (QR)
+## 3. Link WhatsApp (phone pairing code — no QR)
 
 1. Wait for the deploy to go **Live**
-2. Open `https://<your-service>.onrender.com/qr`
-3. On your phone: **WhatsApp → Linked Devices → Link a device** → scan the QR
-4. Page should switch to **Connected**
+2. Open `https://<your-service>.onrender.com/`
+3. Enter your WhatsApp number with country code, digits only (e.g. `26377xxxxxxx`)
+4. Tap **Get pairing code** — an 8-digit code appears (like `ABCD-EFGH`)
+5. On your phone: **WhatsApp → Linked Devices → Link a device → Link with phone number instead**
+6. Enter that code → page should switch to **Connected**
 
-You can also scan the ASCII QR in **Render → Logs**.
+Optional: set env `WHATSAPP_PHONE_NUMBER=26377xxxxxxx` so the code is requested automatically.
 
 ## 4. Test
 

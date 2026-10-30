@@ -26,8 +26,10 @@ Full steps: [docs/render-deploy.md](../docs/render-deploy.md)
 1. Push this repo and open [Render Dashboard](https://dashboard.render.com) → **New → Blueprint**
 2. Select repo `-AI` and branch with `render.yaml`
 3. Set `GEMINI_API_KEY` when prompted (Starter plan — Free sleeps and drops WhatsApp)
-4. After deploy: open `https://<service>.onrender.com/qr` and scan with **WhatsApp → Linked Devices**
-5. Message that WhatsApp number — shop directory + Gemini replies
+4. After deploy: open `https://<service>.onrender.com/`
+5. Enter your number (country code, digits only) → **Get pairing code**
+6. Phone: **WhatsApp → Linked Devices → Link a device → Link with phone number instead** → enter the code
+7. Message that WhatsApp number — shop directory + Gemini replies
 
 Session files live on the Render disk at `/var/data/auth_info_baileys` so redeploys keep the link.
 
@@ -41,10 +43,10 @@ npm install
 npm start
 ```
 
-1. Open `http://localhost:10000/qr` (or scan the terminal QR).
-2. On your phone: **WhatsApp → Linked Devices → Link a device** → scan.
-3. Session files land in `auth_info_baileys/` (gitignored). Keep them private.
-4. Message that linked WhatsApp number — the bot replies from the mall shop directory / Gemini.
+1. Open `http://localhost:10000/`
+2. Enter phone (e.g. `26377xxxxxxx`) → get pairing code
+3. WhatsApp → Linked Devices → **Link with phone number instead** → enter code
+4. Message that number — mall bot replies. Auth stays in `auth_info_baileys/` (gitignored).
 
 ## Cron jobs
 
