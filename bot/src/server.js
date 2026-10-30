@@ -208,6 +208,12 @@ export function startHttpServer({
           catalogCount: catalog.count,
           catalogUpdatedAt: catalog.updatedAt,
           liveShopCount: getShops().length,
+          siteRoot: getSiteRoot(),
+          siteIndex: fs.existsSync(path.join(getSiteRoot(), "index.html")),
+          siteShop: fs.existsSync(path.join(getSiteRoot(), "shop", "index.html")),
+          siteDayPng: fs.existsSync(
+            path.join(getSiteRoot(), "trade-square-day.png")
+          ),
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,

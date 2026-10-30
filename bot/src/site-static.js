@@ -8,13 +8,18 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Prefer bot/public (rootDir=bot deploys), else repo root. */
+/** Prefer bot/public (rootDir=bot deploys), else cwd/public, else repo root. */
 function resolveDefaultRoot() {
-  const bundled = path.resolve(__dirname, "../public");
-  if (fs.existsSync(path.join(bundled, "index.html"))) return bundled;
-  const repoRoot = path.resolve(__dirname, "../..");
-  if (fs.existsSync(path.join(repoRoot, "index.html"))) return repoRoot;
-  return bundled;
+  const candidates = [
+    path.resolve(__dirname, "../public"),
+    path.resolve(process.cwd(), "public"),
+    path.resolve(process.cwd()),
+    path.resolve(__dirname, "../.."),
+  ];
+  for (const root of candidates) {
+    if (fs.existsSync(path.join(root, "index.html"))) return root;
+  }
+  return candidates[0];
 }
 
 const BLOCKED_PREFIXES = [
@@ -62,7 +67,10 @@ const MIME = {
 const SPA_SHELL = new Set(["/dine", "/visit", "/events"]);
 
 export function getSiteRoot() {
-  if (process.env.SITE_ROOT) return path.resolve(process.env.SITE_ROOT);
+  if (process.env.SITE_ROOT) {
+    const envRoot = path.resolve(process.env.SITE_ROOT);
+    if (fs.existsSync(path.join(envRoot, "index.html"))) return envRoot;
+  }
   return resolveDefaultRoot();
 }
 
