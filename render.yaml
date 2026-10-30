@@ -1,9 +1,8 @@
 # Trade Square Mall on Render
 # - Web service: WhatsApp bot + mall website (/, /shop, /enroll, assets)
+# - Cron job: pings /health every 5 minutes so the bot stays awake
 # - Site files ship in bot/public (works with rootDir: bot)
-# - Catalog API: GET/PUT /catalog (same origin as the site)
-# Dashboard: New → Blueprint → connect this repo → apply render.yaml
-# Docs: docs/render-deploy.md  ·  Requires a paid plan for persistent disk + always-on
+# Docs: docs/render-deploy.md  ·  Prefer Starter+ so WhatsApp never sleeps
 
 services:
   - type: web
@@ -27,6 +26,8 @@ services:
         value: /var/data/auth_info_baileys
       - key: SITE_ROOT
         value: /opt/render/project/src/public
+      - key: KEEP_ALIVE_URL
+        value: https://ai-mallbot.onrender.com/health
       - key: LOG_LEVEL
         value: info
       - key: GEMINI_API_KEY
@@ -37,3 +38,20 @@ services:
         value: "0"
       - key: CATALOG_SYNC_TOKEN
         sync: false
+
+  # External keep-alive: wakes / verifies the web service every 5 minutes.
+  # Apply via Blueprint sync, or create Cron Job manually with the same command.
+  - type: cron
+    name: trade-square-bot-keepalive
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: bot
+    schedule: "*/5 * * * *"
+    buildCommand: "true"
+    startCommand: node scripts/keep-alive.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: KEEP_ALIVE_URL
+        value: https://ai-mallbot.onrender.com/health

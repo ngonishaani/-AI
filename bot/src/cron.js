@@ -1,16 +1,22 @@
 import cron from "node-cron";
 
 /**
- * Cron jobs that keep the Baileys session healthy and optionally
- * push mall reminders. All schedules use Africa/Harare (Zimbabwe).
+ * Cron jobs that keep the Baileys session alive on Render:
+ *   - frequent WhatsApp health + reconnect
+ *   - HTTP self-ping so the web process stays warm
+ *   - presence poke so the linked device session stays active
+ *   - optional daily broadcast
+ *
+ * Schedules use Africa/Harare (Zimbabwe).
  */
 export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
   const jobs = [];
+  const healthUrl = resolveHealthUrl();
 
-  // Every 5 minutes: connection health + reconnect if the socket dropped.
+  // Every 2 minutes: connection health + reconnect if the socket dropped.
   jobs.push(
     cron.schedule(
-      "*/5 * * * *",
+      "*/2 * * * *",
       async () => {
         const status = getStatus();
         logger.info(
@@ -30,10 +36,45 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
     )
   );
 
-  // Every hour on the hour: lightweight presence poke so the session stays warm.
+  // Every 3 minutes: hit our own /health so hosts that idle inactive
+  // HTTP services (e.g. Render free) keep this process awake.
   jobs.push(
     cron.schedule(
-      "0 * * * *",
+      "*/3 * * * *",
+      async () => {
+        if (!healthUrl) return;
+        try {
+          const res = await fetch(healthUrl, {
+            method: "GET",
+            headers: { "user-agent": "trade-square-bot-self-keepalive/1.0" },
+          });
+          const text = (await res.text()).slice(0, 40);
+          if (!res.ok) {
+            logger.warn(
+              { status: res.status, text, healthUrl },
+              "cron keep-alive ping failed"
+            );
+            return;
+          }
+          logger.info(
+            { status: res.status, healthUrl },
+            "cron keep-alive ping ok"
+          );
+        } catch (err) {
+          logger.warn(
+            { err: err?.message || err, healthUrl },
+            "cron keep-alive ping error"
+          );
+        }
+      },
+      { timezone: "Africa/Harare" }
+    )
+  );
+
+  // Every 15 minutes: presence poke so the WhatsApp session stays warm.
+  jobs.push(
+    cron.schedule(
+      "*/15 * * * *",
       async () => {
         const sock = getSock();
         if (!sock || getStatus() !== "open") return;
@@ -74,6 +115,29 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
     logger.info({ schedule, broadcastJid }, "cron broadcast enabled");
   }
 
-  logger.info(`cron: started ${jobs.length} job(s)`);
+  logger.info(
+    { jobs: jobs.length, healthUrl: healthUrl || null },
+    "cron: keep-alive started"
+  );
   return () => jobs.forEach((j) => j.stop());
+}
+
+function resolveHealthUrl() {
+  const explicit =
+    process.env.KEEP_ALIVE_URL?.trim() ||
+    process.env.BOT_HEALTH_URL?.trim() ||
+    "";
+  if (explicit) return explicit;
+
+  const base =
+    process.env.BOT_PUBLIC_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    "";
+  if (base) return `${base.replace(/\/$/, "")}/health`;
+
+  // Last resort for the known production service
+  if (process.env.NODE_ENV === "production" || process.env.RENDER) {
+    return "https://ai-mallbot.onrender.com/health";
+  }
+  return "";
 }
