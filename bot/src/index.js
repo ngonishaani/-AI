@@ -29,7 +29,6 @@ import {
   mainMenuList,
   parseMenuSelection,
   productCaption,
-  shopListLines,
   shopMenuList,
   shopSummary,
   textMainMenu,
@@ -242,6 +241,17 @@ async function handleSelection(jid, selection) {
   }
 }
 
+async function applyGeminiAction(jid, action) {
+  if (!action?.type || action.type === "none") return;
+  // Small pause so the natural text arrives first
+  await sleep(350);
+  await handleSelection(jid, action);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function handleIncoming(msg) {
   if (!msg?.message) return;
   if (msg.key.fromMe) return;
@@ -258,7 +268,7 @@ async function handleIncoming(msg) {
   const text = extractText(msg);
   if (!text) {
     await sock.sendMessage(jid, {
-      text: "Send a text message — reply *menu* to browse shops & products, or ask for something like DTF, hoodies, or websites.",
+      text: "Send me a text — tell me what you're looking for, or say *menu* for shops.",
     });
     return;
   }
@@ -276,18 +286,22 @@ async function handleIncoming(msg) {
     currentShopId: state.shopId,
   });
 
+  // Explicit menu shortcuts still work; everything else is natural Gemini chat
   if (selection.type !== "chat") {
     await handleSelection(jid, selection);
-    logger.info({ jid, selection: selection.type }, "menu reply");
+    logger.info({ jid, selection: selection.type }, "menu shortcut");
     return;
   }
 
-  // Free-typed request — answer, then show shops so they can pick or keep typing
-  const reply = await generateMallReply(text);
-  await sock.sendMessage(jid, {
-    text: `${reply}\n\n—\n*Shops*\n${shopListLines()}\n\nReply with a number, shop name, or type what you want.`,
-  });
-  logger.info({ jid, chars: reply.length }, "gemini reply + shop list");
+  const { text: reply, action } = await generateMallReply(text, { jid });
+  if (reply) {
+    await sock.sendMessage(jid, { text: reply });
+  }
+  if (action) {
+    logger.info({ jid, action }, "gemini suggested action");
+    await applyGeminiAction(jid, action);
+  }
+  logger.info({ jid, chars: reply?.length || 0 }, "natural gemini reply");
 }
 
 async function connectToWhatsApp() {
