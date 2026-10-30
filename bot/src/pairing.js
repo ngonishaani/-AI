@@ -1,6 +1,10 @@
 /** Shared pairing-code state for Baileys phone-number linking. */
 
-let pendingPhone = normalizePhone(process.env.WHATSAPP_PHONE_NUMBER || "");
+// Only auto-load phone when explicitly using phone link mode
+let pendingPhone =
+  process.env.WHATSAPP_LINK_MODE === "phone"
+    ? normalizePhone(process.env.WHATSAPP_PHONE_NUMBER || "")
+    : "";
 let latestCode = null;
 let lastError = null;
 let requesting = false;

@@ -10,15 +10,13 @@ import pino from "pino";
 import { generateMallReply, isGeminiConfigured } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
-import {
-  clearPairingCode,
-  maybeRequestPairingCode,
-} from "./pairing.js";
+import { clearPairingCode, maybeRequestPairingCode } from "./pairing.js";
 import {
   ensureAuthDir,
   getAuthStatus,
   resolveAuthDir,
 } from "./auth-path.js";
+import { clearLatestQr, getLatestQr, setLatestQr } from "./qr-state.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -144,15 +142,21 @@ async function connectToWhatsApp() {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      // Only request pairing when NOT already registered
-      if (
-        !sock?.authState?.creds?.registered &&
-        (qr || connection === "connecting")
-      ) {
-        try {
-          await maybeRequestPairingCode(sock, { logger });
-        } catch (err) {
-          logger.warn({ err: err?.message || err }, "pairing request skipped");
+      // QR is the primary link method. Keep latest QR for /qr page.
+      // Phone pairing only runs when user submitted /pair (pending phone set)
+      // or WHATSAPP_LINK_MODE=phone — requesting a code on every QR breaks scanning.
+      if (qr) {
+        setLatestQr(qr);
+        logger.info("QR ready — open /qr on a computer and scan with your phone");
+        if (
+          process.env.WHATSAPP_LINK_MODE === "phone" &&
+          !sock?.authState?.creds?.registered
+        ) {
+          try {
+            await maybeRequestPairingCode(sock, { logger });
+          } catch (err) {
+            logger.warn({ err: err?.message || err }, "pairing request skipped");
+          }
         }
       }
 
@@ -163,7 +167,7 @@ async function connectToWhatsApp() {
 
       if (connection === "open") {
         clearPairingCode();
-        // Force a creds flush after successful link/reconnect
+        clearLatestQr();
         try {
           await saveCreds();
         } catch {
@@ -198,8 +202,9 @@ async function connectToWhatsApp() {
           return;
         }
         clearPairingCode();
+        clearLatestQr();
         logger.error(
-          "Logged out from WhatsApp. Pair again once; keep the Render disk so this does not repeat on redeploy."
+          "Logged out from WhatsApp. Open /qr and scan once; keep the Render disk so this does not repeat on redeploy."
         );
       }
     });
@@ -250,6 +255,7 @@ httpServer = startHttpServer({
   getStatus,
   getSock,
   getAuthInfo,
+  getLatestQr,
   logger,
   isGeminiConfigured,
 });
