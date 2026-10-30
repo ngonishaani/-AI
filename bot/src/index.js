@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
@@ -7,16 +8,19 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
-import qrcode from "qrcode-terminal";
+import qrcodeTerminal from "qrcode-terminal";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateMallReply } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
+import { startHttpServer } from "./server.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR =
   process.env.BAILEYS_AUTH_DIR ||
   path.join(__dirname, "..", "auth_info_baileys");
+
+fs.mkdirSync(AUTH_DIR, { recursive: true });
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -24,8 +28,10 @@ const logger = pino({
 
 let sock = null;
 let connectionStatus = "close";
+let latestQr = null;
 let reconnecting = false;
 let stopCron = null;
+let httpServer = null;
 const recentMsgIds = new Map();
 
 function seenRecently(id) {
@@ -62,7 +68,6 @@ async function handleIncoming(msg) {
   const jid = msg.key.remoteJid;
   if (!jid) return;
 
-  // Skip groups unless explicitly enabled
   if (jid.endsWith("@g.us") && process.env.BOT_ALLOW_GROUPS !== "1") {
     return;
   }
@@ -115,8 +120,10 @@ async function connectToWhatsApp() {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        latestQr = qr;
         console.log("\nScan this QR with WhatsApp → Linked Devices:\n");
-        qrcode.generate(qr, { small: true });
+        console.log(`Or open https://YOUR-RENDER-URL/qr\n`);
+        qrcodeTerminal.generate(qr, { small: true });
       }
 
       if (connection) {
@@ -125,6 +132,7 @@ async function connectToWhatsApp() {
       }
 
       if (connection === "open") {
+        latestQr = null;
         logger.info("WhatsApp connected — Trade Square Mall bot is live");
       }
 
@@ -150,8 +158,9 @@ async function connectToWhatsApp() {
           }, delay);
           return;
         }
+        latestQr = null;
         logger.error(
-          "Logged out — delete auth_info_baileys and scan a new QR"
+          "Logged out — clear auth on the Render disk and scan a new QR"
         );
       }
     });
@@ -190,11 +199,15 @@ function getSock() {
 function getStatus() {
   return connectionStatus;
 }
+function getLatestQr() {
+  return latestQr;
+}
 async function reconnect() {
   if (connectionStatus === "open" && sock) return;
   await connectToWhatsApp();
 }
 
+httpServer = startHttpServer({ getStatus, getLatestQr, logger });
 await connectToWhatsApp();
 stopCron = startCronJobs({
   getSock,
@@ -205,6 +218,11 @@ stopCron = startCronJobs({
 
 function shutdown() {
   stopCron?.();
+  try {
+    httpServer?.close?.();
+  } catch {
+    /* ignore */
+  }
   try {
     sock?.end?.(undefined);
   } catch {

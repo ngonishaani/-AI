@@ -17,9 +17,21 @@ Baileys (WhatsApp Web multi-device socket)  ← always-on Node process
 
 - Node.js **20+**
 - A phone with WhatsApp to scan the QR (Linked Devices)
-- Always-on host (VPS, Railway, Render, Fly.io, PM2 on a server) — **not** Vercel serverless
+- Always-on host — **Render (recommended)** / VPS / Railway — **not** Vercel serverless
 
-## Setup
+## Deploy on Render (recommended)
+
+Full steps: [docs/render-deploy.md](../docs/render-deploy.md)
+
+1. Push this repo and open [Render Dashboard](https://dashboard.render.com) → **New → Blueprint**
+2. Select repo `-AI` and branch with `render.yaml`
+3. Set `GEMINI_API_KEY` when prompted (Starter plan — Free sleeps and drops WhatsApp)
+4. After deploy: open `https://<service>.onrender.com/qr` and scan with **WhatsApp → Linked Devices**
+5. Message that WhatsApp number — shop directory + Gemini replies
+
+Session files live on the Render disk at `/var/data/auth_info_baileys` so redeploys keep the link.
+
+## Local setup
 
 ```bash
 cd bot
@@ -29,7 +41,7 @@ npm install
 npm start
 ```
 
-1. A QR code prints in the terminal.
+1. Open `http://localhost:10000/qr` (or scan the terminal QR).
 2. On your phone: **WhatsApp → Linked Devices → Link a device** → scan.
 3. Session files land in `auth_info_baileys/` (gitignored). Keep them private.
 4. Message that linked WhatsApp number — the bot replies from the mall shop directory / Gemini.
