@@ -1,0 +1,342 @@
+/* Enrolment page — extends Trade Square design tokens */
+
+.enrol-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.75fr);
+  gap: 36px;
+  align-items: start;
+  padding-top: 12px;
+  padding-bottom: 96px;
+}
+
+.enrol-form,
+.enrol-aside__panel {
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+
+.enrol-form {
+  padding: 28px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.enrol-block__head h2,
+.enrol-aside__panel h2 {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-top: 6px;
+}
+
+.enrol-block__head--row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.enrol-block__head:not(.enrol-block__head--row) {
+  margin-bottom: 18px;
+}
+
+.enrol-fields {
+  display: grid;
+  gap: 18px;
+}
+
+.enrol-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.enrol-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enrol-field input,
+.enrol-field select,
+.enrol-field textarea {
+  font-size: 1.02rem;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  border-radius: 0;
+  padding: 10px 0;
+  width: 100%;
+}
+
+.enrol-field textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.5;
+}
+
+.enrol-field input:focus,
+.enrol-field select:focus,
+.enrol-field textarea:focus {
+  outline: none;
+  border-bottom-color: var(--brass);
+}
+
+.enrol-field.is-invalid input,
+.enrol-field.is-invalid select,
+.enrol-field.is-invalid textarea {
+  border-bottom-color: #a33;
+}
+
+.enrol-field--file input[type="file"] {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--paper-deep);
+  cursor: pointer;
+}
+
+.enrol-file-hint {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.enrol-preview {
+  margin-top: -6px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  max-height: 220px;
+}
+
+.enrol-preview img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.product-list {
+  display: grid;
+  gap: 16px;
+}
+
+.product-card {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  animation: enrol-rise 0.45s ease both;
+}
+
+.product-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.product-card__head h3 {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.enrol-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.enrol-note {
+  min-height: 1.4em;
+  color: var(--brass);
+  font-weight: 600;
+}
+
+.enrol-note.is-error {
+  color: #8b2e2e;
+}
+
+.enrol-aside__panel {
+  padding: 26px 24px 28px;
+  position: sticky;
+  top: calc(var(--nav-h) + 16px);
+}
+
+.enrol-aside__dek {
+  color: var(--ink-soft);
+  margin: 10px 0 16px;
+  font-size: 0.98rem;
+}
+
+.enrol-aside__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.enrolled-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.enrolled-item {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  animation: enrol-rise 0.5s ease both;
+}
+
+.enrolled-item__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.enrolled-item strong {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.enrolled-item__meta {
+  color: var(--brass);
+  font-size: 0.88rem;
+}
+
+.enrolled-item__desc {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.enrolled-item__products {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.enrolled-item__products li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.92rem;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.enrolled-item__products li:first-child {
+  border-top: 0;
+}
+
+.enrolled-item__thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--paper-deep);
+  flex-shrink: 0;
+}
+
+.enrolled-item__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+#enrolled-empty[hidden],
+.enrol-preview[hidden],
+.menu[hidden] {
+  display: none !important;
+}
+
+@keyframes enrol-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-head h1 {
+  animation: enrol-rise 0.7s ease both;
+}
+
+.page-dek {
+  animation: enrol-rise 0.7s ease 0.08s both;
+}
+
+.enrol-form {
+  animation: enrol-rise 0.75s ease 0.12s both;
+}
+
+.enrol-aside__panel {
+  animation: enrol-rise 0.75s ease 0.2s both;
+}
+
+@media (max-width: 980px) {
+  .enrol-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .enrol-aside__panel {
+    position: static;
+  }
+
+  .enrol-form {
+    padding: 22px 18px 26px;
+  }
+}
+
+@media (max-width: 680px) {
+  .enrol-row {
+    grid-template-columns: 1fr;
+  }
+
+  .enrol-block__head--row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enrol-form,
+  .enrol-aside__panel,
+  .page-head h1,
+  .page-dek,
+  .product-card,
+  .enrolled-item {
+    animation: none !important;
+  }
+}

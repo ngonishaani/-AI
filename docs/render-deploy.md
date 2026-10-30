@@ -24,14 +24,14 @@ Blueprint file: [`render.yaml`](../render.yaml) at the repo root.
 
 The Blueprint sets:
 
-- Build: `npm install --prefix bot` (repo root deploy so website files are included)
-- Start: `npm start --prefix bot`
-- `SITE_ROOT=/opt/render/project/src` (serves `index.html`, `shop/`, `enroll/`, `assets/`)
+- `rootDir: bot` · Build `npm install` · Start `npm start`
+- Mall site files live in **`bot/public`** (synced from the repo root via `bot/scripts/sync-site.sh`)
+- `SITE_ROOT=/opt/render/project/src/public`
 - Disk at `/var/data` (WhatsApp session survives redeploys)
 - `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`
 - Health check: `/health`
 
-> If this service previously used `rootDir: bot`, clear that override so the **repo root** is deployed. Otherwise `/shop` will 404.
+After changing homepage / shop / enroll pages at the repo root, run `bot/scripts/sync-site.sh` before committing so Render gets the update.
 
 ## 3. Verify the website
 
@@ -86,7 +86,7 @@ After that, redeploys reconnect automatically (no pairing).
 
 | Do | Don’t |
 |----|--------|
-| Deploy from **repo root** (website + bot) | Keep `rootDir: bot` (site files missing) |
+| Keep `bot/public` in sync (`bot/scripts/sync-site.sh`) | Edit only the repo-root site and forget to sync |
 | Use Starter (or higher) so the service stays up | Use Free web (sleeps → WhatsApp disconnects) |
 | Keep the 1GB disk at `/var/data` | Delete the disk (forces pairing again) |
 | Set `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys` | Leave auth in the repo folder (wiped each deploy) |
@@ -97,9 +97,9 @@ After that, redeploys reconnect automatically (no pairing).
 
 **New → Web Service** → same repo →:
 
-- Root directory: *(leave empty / repo root)*
-- Build: `npm install --prefix bot`
-- Start: `npm start --prefix bot`
+- Root directory: `bot`
+- Build: `npm install`
+- Start: `npm start`
 - Instance: Starter+
 - Advanced → disk mount `/var/data`, 1 GB
-- Env: `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`, `SITE_ROOT=/opt/render/project/src`, `GEMINI_API_KEY=…`, `NODE_VERSION=20`
+- Env: `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`, `SITE_ROOT=/opt/render/project/src/public`, `GEMINI_API_KEY=…`, `NODE_VERSION=20`

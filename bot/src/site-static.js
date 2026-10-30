@@ -8,7 +8,14 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DEFAULT_ROOT = path.resolve(__dirname, "../..");
+/** Prefer bot/public (rootDir=bot deploys), else repo root. */
+function resolveDefaultRoot() {
+  const bundled = path.resolve(__dirname, "../public");
+  if (fs.existsSync(path.join(bundled, "index.html"))) return bundled;
+  const repoRoot = path.resolve(__dirname, "../..");
+  if (fs.existsSync(path.join(repoRoot, "index.html"))) return repoRoot;
+  return bundled;
+}
 
 const BLOCKED_PREFIXES = [
   "bot/",
@@ -16,6 +23,9 @@ const BLOCKED_PREFIXES = [
   "node_modules/",
   "docs/",
   ".cursor/",
+  "src/",
+  "scripts/",
+  "public/",
 ];
 
 const BLOCKED_NAMES = new Set([
@@ -52,9 +62,8 @@ const MIME = {
 const SPA_SHELL = new Set(["/dine", "/visit", "/events"]);
 
 export function getSiteRoot() {
-  return process.env.SITE_ROOT
-    ? path.resolve(process.env.SITE_ROOT)
-    : DEFAULT_ROOT;
+  if (process.env.SITE_ROOT) return path.resolve(process.env.SITE_ROOT);
+  return resolveDefaultRoot();
 }
 
 function safeJoin(root, requestPath) {
