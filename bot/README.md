@@ -75,4 +75,5 @@ pm2 save
 - Without `GEMINI_API_KEY`, marketplace menus still work (shops, products, prices, store WhatsApp links).
 - Sample shop catalog: RoyaleApe Studios from [royaleape.com](https://royaleape.com/) (Shop 55).
 - Enrolments from [tradesquaremall.com/enroll](https://www.tradesquaremall.com/enroll/) sync to `PUT /catalog` and merge into the live shop list (`GET /catalog`, `GET /status` → `liveShopCount`).
+- Shop photos (upload or URL) are shown on WhatsApp when a shop is opened. Uploads are stored on the Render disk under `shop-media/` and served from `GET /media/<file>`.
 - Do not commit `auth_info_baileys/` or `.env`.

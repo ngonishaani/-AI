@@ -6,18 +6,22 @@ import {
   maybeRequestPairingCode,
 } from "./pairing.js";
 import { getGeminiDiagnostics, testGemini } from "./gemini.js";
+import fs from "node:fs";
+import path from "node:path";
 import {
   getCatalogMeta,
   loadEnrolledRaw,
   saveEnrolledRaw,
   listNormalizedEnrolled,
+  mediaDir,
+  resolvePublicImageUrl,
 } from "./catalog-store.js";
 import { getShops } from "./marketplace.js";
 import { textMainMenu } from "./menus.js";
 
 /**
- *   GET  /health /status /catalog /menu-preview / /qr /qr.png /pair
- *   PUT  /catalog   (enrol page sync)
+ *   GET  /health /status /catalog /menu-preview /media/* / /qr /qr.png /pair
+ *   PUT  /catalog   (enrol page sync — may include data-URL shop photos)
  *   POST /pair  /relink
  */
 export function startHttpServer({
@@ -37,7 +41,9 @@ export function startHttpServer({
 
     if (
       req.method === "OPTIONS" &&
-      (pathName.startsWith("/catalog") || pathName === "/menu-preview")
+      (pathName.startsWith("/catalog") ||
+        pathName === "/menu-preview" ||
+        pathName.startsWith("/media/"))
     ) {
       return sendCors(res, 204, "");
     }
@@ -59,6 +65,8 @@ export function startHttpServer({
           floor: s.floor,
           number: s.number,
           enrolled: Boolean(s.enrolled),
+          hasImage: Boolean(s.image),
+          image: s.image || "",
           productCount: s.products?.length || 0,
         })),
         menuText: textMainMenu(),
@@ -68,9 +76,11 @@ export function startHttpServer({
     if (pathName === "/catalog" && req.method === "GET") {
       const enrolled = loadEnrolledRaw();
       const meta = getCatalogMeta();
+      // Absolute image URLs so the enrol page can preview persisted uploads
+      const shops = enrolled.shops.map((shop) => publicizeShopImages(shop));
       return sendCorsJson(res, 200, {
         ok: true,
-        shops: enrolled.shops,
+        shops,
         normalized: listNormalizedEnrolled(),
         live: getShops().map((s) => ({
           id: s.id,
@@ -78,6 +88,7 @@ export function startHttpServer({
           floor: s.floor,
           number: s.number,
           enrolled: Boolean(s.enrolled),
+          hasImage: Boolean(s.image),
           productCount: s.products?.length || 0,
         })),
         updatedAt: meta.updatedAt,
@@ -93,7 +104,7 @@ export function startHttpServer({
         });
       }
       try {
-        const body = await readBody(req);
+        const body = await readBody(req, { maxBytes: 12 * 1024 * 1024 });
         const shops = Array.isArray(body?.shops)
           ? body.shops
           : Array.isArray(body)
@@ -107,8 +118,14 @@ export function startHttpServer({
         }
         const saved = saveEnrolledRaw(shops);
         const omitted = saved.shops.filter((s) => s?.imageOmitted).length;
+        const withImages = saved.shops.filter((s) => s?.image).length;
         logger.info(
-          { count: saved.shops.length, updatedAt: saved.updatedAt, omittedImages: omitted },
+          {
+            count: saved.shops.length,
+            updatedAt: saved.updatedAt,
+            omittedImages: omitted,
+            shopsWithImages: withImages,
+          },
           "Marketplace catalog updated from enrol sync"
         );
         return sendCorsJson(res, 200, {
@@ -117,6 +134,8 @@ export function startHttpServer({
           updatedAt: saved.updatedAt,
           liveCount: getShops().length,
           omittedImages: omitted,
+          shopsWithImages: withImages,
+          shops: saved.shops.map((shop) => publicizeShopImages(shop)),
           menuText: textMainMenu(),
         });
       } catch (err) {
@@ -126,6 +145,37 @@ export function startHttpServer({
           error: err?.message || String(err),
         });
       }
+    }
+
+    if (pathName.startsWith("/media/") && req.method === "GET") {
+      const filename = path.basename(pathName.slice("/media/".length));
+      if (!filename || !/\.(jpe?g|png|webp|gif)$/i.test(filename)) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
+      }
+      const filePath = path.join(mediaDir(), filename);
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
+      }
+      const ext = path.extname(filename).toLowerCase();
+      const type =
+        ext === ".png"
+          ? "image/png"
+          : ext === ".webp"
+            ? "image/webp"
+            : ext === ".gif"
+              ? "image/gif"
+              : "image/jpeg";
+      res.writeHead(200, {
+        "Content-Type": type,
+        "Cache-Control": "public, max-age=86400",
+        "Access-Control-Allow-Origin": "*",
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
     }
 
     if (pathName === "/status") {
@@ -459,10 +509,36 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function readBody(req) {
-  return new Promise((resolve) => {
+function publicizeShopImages(shop) {
+  if (!shop || typeof shop !== "object") return shop;
+  const next = {
+    ...shop,
+    image: resolvePublicImageUrl(shop.image),
+  };
+  if (Array.isArray(shop.products)) {
+    next.products = shop.products.map((p) =>
+      p && typeof p === "object"
+        ? { ...p, image: resolvePublicImageUrl(p.image || shop.image) }
+        : p
+    );
+  }
+  return next;
+}
+
+function readBody(req, { maxBytes = 2 * 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on("data", (c) => chunks.push(c));
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > maxBytes) {
+        reject(new Error(`Request body too large (max ${Math.round(maxBytes / 1024 / 1024)}MB)`));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("error", reject);
     req.on("end", () => {
       const raw = Buffer.concat(chunks).toString("utf8");
       if (!raw) return resolve({});
