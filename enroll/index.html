@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Enrol your shop and products at Trade Square Mall, Kwekwe."
+    />
+    <meta name="theme-color" content="#004741" />
+    <title>Enrol a shop · Trade Square Mall</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/index-1c19cfd8.css" />
+    <link rel="stylesheet" href="/assets/enroll.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav nav--light" id="site-nav">
+      <div class="nav-inner">
+        <a class="logo logo-link" href="/" aria-label="Trade Square Mall home">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <circle class="mark-outer" cx="16" cy="16" r="12" />
+            <circle class="mark-inner" cx="16" cy="16" r="7" />
+            <circle class="mark-core" cx="16" cy="16" r="2.5" />
+          </svg>
+          Trade Square
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="/shop">Shop</a>
+          <a href="/dine">Dine</a>
+          <a href="/events">Events</a>
+          <a href="/visit">Visit</a>
+          <a href="/enroll/" aria-current="page">Enrol</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn btn--small" href="#enrol-form">Enrol a shop</a>
+          <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" id="menu-toggle">
+            Menu
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="menu" id="mobile-menu" hidden>
+      <nav aria-label="Mobile">
+        <a href="/shop">Shop</a>
+        <a href="/dine">Dine</a>
+        <a href="/events">Events</a>
+        <a href="/visit">Visit</a>
+        <a href="/enroll/" aria-current="page">Enrol</a>
+      </nav>
+    </div>
+
+    <main id="main" class="main--offset">
+      <section class="page-head wrap">
+        <p class="kicker">Trade Square Mall · Kwekwe</p>
+        <h1>Enrol your shop</h1>
+        <p class="page-dek">
+          Add your shop to the Trade Square directory — name, floor, unit number,
+          image, and the products you sell.
+        </p>
+      </section>
+
+      <section class="section section--tight wrap enrol-layout">
+        <form class="enrol-form" id="enrol-form" novalidate>
+          <div class="enrol-block">
+            <header class="enrol-block__head">
+              <p class="kicker">Shop</p>
+              <h2>Shop details</h2>
+            </header>
+
+            <div class="enrol-fields">
+              <label class="enrol-field">
+                <span>Shop name</span>
+                <input name="name" type="text" required autocomplete="organization" placeholder="e.g. RoyaleApe Studios" />
+              </label>
+
+              <div class="enrol-row">
+                <label class="enrol-field">
+                  <span>Floor</span>
+                  <select name="floor" required>
+                    <option value="">Select floor</option>
+                    <option>Ground floor</option>
+                    <option>Level 1</option>
+                    <option>Level 2</option>
+                    <option>Rooftop</option>
+                  </select>
+                </label>
+                <label class="enrol-field">
+                  <span>Number</span>
+                  <input name="number" type="text" required placeholder="e.g. Shop 55" />
+                </label>
+              </div>
+
+              <label class="enrol-field">
+                <span>Image</span>
+                <input name="image" type="url" inputmode="url" placeholder="https://… shop photo or logo URL" />
+              </label>
+              <label class="enrol-field enrol-field--file">
+                <span class="sr-only">Or upload an image</span>
+                <input name="imageFile" type="file" accept="image/*" />
+                <span class="enrol-file-hint" id="image-hint">Or upload a photo (max 1.5&nbsp;MB)</span>
+              </label>
+              <div class="enrol-preview" id="image-preview" hidden>
+                <img alt="Shop image preview" />
+              </div>
+
+              <label class="enrol-field">
+                <span>Description</span>
+                <textarea name="description" rows="4" required placeholder="What shoppers will find here…"></textarea>
+              </label>
+
+              <label class="enrol-field">
+                <span>Link</span>
+                <input name="link" type="url" inputmode="url" placeholder="https://… website or WhatsApp" />
+              </label>
+            </div>
+          </div>
+
+          <div class="enrol-block">
+            <header class="enrol-block__head enrol-block__head--row">
+              <div>
+                <p class="kicker">Products</p>
+                <h2>What you sell</h2>
+              </div>
+              <button class="btn btn--line btn--small" type="button" id="add-product">
+                Add product
+              </button>
+            </header>
+            <div class="product-list" id="product-list" aria-live="polite"></div>
+          </div>
+
+          <div class="enrol-actions">
+            <button class="btn" type="submit">Save enrolment</button>
+            <button class="text-button" type="reset" id="reset-form">Clear form</button>
+          </div>
+          <p class="enrol-note" id="form-status" role="status" aria-live="polite"></p>
+        </form>
+
+        <aside class="enrol-aside">
+          <div class="enrol-aside__panel">
+            <p class="kicker">Directory</p>
+            <h2>Enrolled shops</h2>
+            <p class="enrol-aside__dek">
+              Shops saved on this device. Export JSON to share with the mall team or WhatsApp marketplace.
+            </p>
+            <div class="enrol-aside__actions">
+              <button class="btn btn--small btn--line" type="button" id="export-json">Export JSON</button>
+              <button class="text-button" type="button" id="clear-all">Clear all</button>
+            </div>
+            <ul class="enrolled-list" id="enrolled-list"></ul>
+            <p class="empty" id="enrolled-empty">No shops enrolled yet.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-grid">
+        <div>
+          <p class="kicker">Trade Square Mall</p>
+          <p class="footer-address">
+            Kwekwe, Zimbabwe
+            <span>Modern shopping and business in the heart of the city.</span>
+          </p>
+          <a class="btn btn--small" href="/visit">Plan a visit</a>
+        </div>
+        <div>
+          <p class="kicker">Explore</p>
+          <ul>
+            <li><a href="/shop">Shop</a></li>
+            <li><a href="/dine">Dine</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/enroll/">Enrol</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="kicker">Visit</p>
+          <ul>
+            <li><a href="/visit#hours">Hours</a></li>
+            <li><a href="/visit#arrive">Getting here</a></li>
+            <li><a href="/visit#concierge">Concierge</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="kicker">Contact</p>
+          <ul>
+            <li><a href="/visit#concierge">Leave a note</a></li>
+            <li><a href="https://www.google.com/maps/search/?api=1&query=Trade%20Square%20Mall%2C%20Kwekwe%2C%20Zimbabwe" target="_blank" rel="noreferrer">Open maps</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="wrap footer-base">
+        <span>© Trade Square Mall · Kwekwe</span>
+        <span>Enrolment saves to this browser until you export or clear.</span>
+      </div>
+    </footer>
+
+    <template id="product-template">
+      <article class="product-card" data-product>
+        <header class="product-card__head">
+          <h3>Product <span data-product-index>1</span></h3>
+          <button class="text-button" type="button" data-remove-product>Remove</button>
+        </header>
+        <div class="enrol-fields">
+          <div class="enrol-row">
+            <label class="enrol-field">
+              <span>Name</span>
+              <input data-field="name" type="text" required placeholder="Product name" />
+            </label>
+            <label class="enrol-field">
+              <span>Price</span>
+              <input data-field="price" type="text" inputmode="decimal" placeholder="e.g. 1.50 USD" />
+            </label>
+          </div>
+          <label class="enrol-field">
+            <span>Variation</span>
+            <input data-field="variation" type="text" placeholder="e.g. A3 Size, Hoodie, Red" />
+          </label>
+          <label class="enrol-field">
+            <span>Link</span>
+            <input data-field="link" type="url" inputmode="url" placeholder="https://… product page" />
+          </label>
+        </div>
+      </article>
+    </template>
+
+    <script src="/assets/enroll.js" defer></script>
+  </body>
+</html>

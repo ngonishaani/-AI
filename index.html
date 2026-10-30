@@ -61,6 +61,42 @@
   else scan();
 })();
 </script>
+<script>
+(function () {
+  function addEnrolLinks() {
+    document.querySelectorAll(".nav-links").forEach(function (nav) {
+      if (nav.querySelector('[data-enrol-link="1"]')) return;
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol";
+      a.setAttribute("data-enrol-link", "1");
+      nav.appendChild(a);
+    });
+    document.querySelectorAll(".menu nav").forEach(function (nav) {
+      if (nav.querySelector('[data-enrol-link="1"]')) return;
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol";
+      a.setAttribute("data-enrol-link", "1");
+      nav.appendChild(a);
+    });
+    document.querySelectorAll(".footer-grid ul").forEach(function (list, index) {
+      if (index !== 0 || list.querySelector('[data-enrol-link="1"]')) return;
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "/enroll/";
+      a.textContent = "Enrol a shop";
+      a.setAttribute("data-enrol-link", "1");
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+  }
+  var obs = new MutationObserver(addEnrolLinks);
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addEnrolLinks);
+  else addEnrolLinks();
+})();
+</script>
 
   </body>
 </html>
