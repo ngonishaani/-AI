@@ -264,7 +264,7 @@ export async function testGemini() {
   for (const model of MODEL_FALLBACKS) {
     for (const useSystemInstruction of [true, false]) {
       try {
-        const reply = await callGemini(apiKey, model, probe, {
+        const reply = await callGeminiWithRetry(apiKey, model, probe, {
           useSystemInstruction,
         });
         if (reply) {
@@ -280,6 +280,7 @@ export async function testGemini() {
         }
       } catch (err) {
         lastErr = err?.message || String(err);
+        console.error(`testGemini ${model} failed:`, lastErr);
       }
     }
   }
@@ -291,7 +292,9 @@ export async function testGemini() {
     ok: false,
     configured: true,
     error: lastGemini.error,
-    hint: "Check the API key is valid and Gemini API is enabled for the Google project.",
+    hint: isHighDemandError({ message: lastErr })
+      ? "Google is rate-limiting right now. Wait 1–2 minutes and open /test-gemini again, or set GEMINI_MODEL=gemini-1.5-flash in Render."
+      : "Check the API key is valid and Gemini API is enabled for the Google project.",
   };
 }
 
@@ -329,7 +332,7 @@ async function generateMallReply(userText, options = {}) {
   for (const model of models) {
     for (const useSystemInstruction of [true, false]) {
       try {
-        const reply = await callGemini(apiKey, model, text, {
+        const reply = await callGeminiWithRetry(apiKey, model, text, {
           useSystemInstruction,
         });
         if (reply) {
@@ -355,7 +358,12 @@ async function generateMallReply(userText, options = {}) {
   lastGemini.error = lastErr || "unknown";
   lastGemini.testedAt = new Date().toISOString();
   console.error("gemini all models failed", lastErr);
-  return directoryFallbackReply(text);
+  // Still answer naturally from directory; tip only on high demand
+  const base = directoryFallbackReply(text);
+  if (isHighDemandError({ message: lastErr })) {
+    return `${base}\n\n_(Gemini is busy right now — try again in a minute.)_`;
+  }
+  return base;
 }
 
 export function isGeminiConfigured() {
