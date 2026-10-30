@@ -9,15 +9,47 @@ import {
   AMENITIES,
 } from "./shop-directory.js";
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Prefer 1.5-flash / lite first — 2.0-flash often hits "high demand"
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 const MODEL_FALLBACKS = [
   DEFAULT_MODEL,
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
   "gemini-1.5-flash",
   "gemini-1.5-flash-latest",
+  "gemini-1.5-flash-8b",
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
   "gemini-flash-latest",
 ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+function isHighDemandError(err) {
+  const msg = String(err?.message || err || "");
+  return /high demand|resource.exhausted|quota|try again later|429|503|unavailable/i.test(
+    msg
+  );
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function callGeminiWithRetry(apiKey, model, text, opts = {}) {
+  const attempts = Number(process.env.GEMINI_RETRIES || 3);
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await callGemini(apiKey, model, text, opts);
+    } catch (err) {
+      lastErr = err;
+      if (!isHighDemandError(err) || i === attempts - 1) throw err;
+      const wait = 400 * (i + 1) * (i + 1);
+      console.warn(
+        `gemini ${model} busy (${err.message}); retry in ${wait}ms`
+      );
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
 
 let lastGemini = {
   ok: false,
