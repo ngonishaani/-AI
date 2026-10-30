@@ -12,7 +12,7 @@ import {
  *   GET  /           pairing form + code
  *   POST /pair       { phone: "26377..." } → request pairing code
  */
-export function startHttpServer({ getStatus, getSock, logger }) {
+export function startHttpServer({ getStatus, getSock, logger, isGeminiConfigured }) {
   const port = Number(process.env.PORT || 10000);
 
   const server = http.createServer(async (req, res) => {
@@ -32,6 +32,7 @@ export function startHttpServer({ getStatus, getSock, logger }) {
         JSON.stringify({
           status: getStatus(),
           linked: getStatus() === "open",
+          geminiConfigured: Boolean(isGeminiConfigured?.()),
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,

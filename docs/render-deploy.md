@@ -36,13 +36,26 @@ The Blueprint already sets:
 
 Optional: set env `WHATSAPP_PHONE_NUMBER=26377xxxxxxx` so the code is requested automatically.
 
-## 4. Test
+## 4. Turn on Gemini (Shona + English)
 
-Message the WhatsApp account you linked (the phone that scanned, as a linked device — customers message that same number). Ask:
+Without this, the bot only uses simple directory keyword replies.
 
-- `hours`
-- `shops on ground floor`
-- `rooftop lounge`
+1. Render → your service → **Environment**
+2. Add / confirm:
+   - **`GEMINI_API_KEY`** = your key from [Google AI Studio](https://aistudio.google.com/apikey)
+   - Optional: **`GEMINI_MODEL`** = `gemini-2.0-flash`
+3. **Save** → **Manual Deploy** (so the new env loads)
+4. Open `https://<service>.onrender.com/status` — should show `"geminiConfigured": true`
+
+## 5. Test
+
+Message the linked WhatsApp number. Try:
+
+- `hours` / `Nguva yekuvhura ndiyani?`
+- `shops on ground floor` / `Pane barber here?`
+- `Masikati, ndinoda rooftop lounge`
+
+Replies should feel natural in English, Shona, or a mix.
 
 ## 5. Important
 

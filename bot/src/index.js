@@ -10,7 +10,7 @@ import { Boom } from "@hapi/boom";
 import pino from "pino";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { generateMallReply } from "./gemini.js";
+import { generateMallReply, isGeminiConfigured } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
 import {
@@ -208,7 +208,19 @@ async function reconnect() {
   await connectToWhatsApp();
 }
 
-httpServer = startHttpServer({ getStatus, getSock, logger });
+httpServer = startHttpServer({
+  getStatus,
+  getSock,
+  logger,
+  isGeminiConfigured,
+});
+if (!isGeminiConfigured()) {
+  logger.warn(
+    "GEMINI_API_KEY is not set — bot will use directory-only replies until you add it in Render → Environment"
+  );
+} else {
+  logger.info("Gemini enabled for natural Shona/English replies");
+}
 await connectToWhatsApp();
 stopCron = startCronJobs({
   getSock,
