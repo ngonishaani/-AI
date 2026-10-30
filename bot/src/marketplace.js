@@ -178,7 +178,7 @@ export function getShop(id) {
 export function getProduct(shopId, productId) {
   const shop = getShop(shopId);
   if (!shop) return null;
-  const product = shop.products.find((p) => p.id === productId);
+  const product = (shop.products || []).find((p) => p.id === productId);
   return product ? { shop, product } : null;
 }
 
