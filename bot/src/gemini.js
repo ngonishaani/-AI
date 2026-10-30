@@ -9,17 +9,23 @@ import {
   AMENITIES,
 } from "./shop-directory.js";
 
-// Prefer 1.5-flash / lite first — 2.0-flash often hits "high demand"
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+// Current Google AI models (gemini-1.5-* and gemini-2.0-* were retired)
+function isRetiredModel(name) {
+  return /^gemini-(1\.5|2\.0)([.-]|$)/i.test(String(name || ""));
+}
+
+const envModel = process.env.GEMINI_MODEL?.trim();
+const DEFAULT_MODEL =
+  envModel && !isRetiredModel(envModel) ? envModel : "gemini-3.8-flash";
+
 const MODEL_FALLBACKS = [
   DEFAULT_MODEL,
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-latest",
-  "gemini-1.5-flash-8b",
-  "gemini-2.0-flash-lite",
-  "gemini-2.0-flash",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
   "gemini-flash-latest",
-].filter((m, i, arr) => m && arr.indexOf(m) === i);
+].filter((m, i, arr) => m && !isRetiredModel(m) && arr.indexOf(m) === i);
 
 function isHighDemandError(err) {
   const msg = String(err?.message || err || "");
@@ -201,9 +207,8 @@ async function callGemini(apiKey, model, text, { useSystemInstruction = true } =
         ],
       },
     ],
+    // Gemini 3.x deprecated temperature/topP — keep config minimal
     generationConfig: {
-      temperature: 0.9,
-      topP: 0.95,
       maxOutputTokens: 900,
     },
   };
