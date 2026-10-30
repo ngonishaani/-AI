@@ -2,12 +2,10 @@
   "name": "trade-square-mall",
   "version": "1.0.0",
   "private": true,
-  "description": "Trade Square Mall · Kwekwe — site + WhatsApp/Gemini concierge",
+  "description": "Trade Square Mall · Kwekwe — static site; WhatsApp bot lives in /bot (Baileys)",
   "scripts": {
-    "build": "echo 'static site + /api serverless — no build step'",
-    "test:directory": "node -e \"const d=require('./lib/shop-directory'); console.log(d.allPlaces().length, d.findPlace('barber')[0].name)\""
-  },
-  "engines": {
-    "node": ">=18"
+    "build": "echo 'static site — no build step'",
+    "bot": "npm --prefix bot start",
+    "bot:install": "npm --prefix bot install"
   }
 }

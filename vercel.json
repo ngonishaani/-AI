@@ -1,9 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "buildCommand": "",
+  "installCommand": "",
+  "outputDirectory": ".",
+  "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/((?!assets/|hero-bg\\.mp4|trade-square-.*\\.png|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ],
@@ -13,12 +17,6 @@
       "headers": [
         { "key": "Content-Type", "value": "video/mp4" },
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
       ]
     }
   ]

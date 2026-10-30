@@ -1,4 +1,4 @@
-const {
+import {
   buildDirectoryContext,
   findPlace,
   HOURS,
@@ -7,7 +7,7 @@ const {
   EVENTS,
   MALL,
   AMENITIES,
-} = require("./shop-directory");
+} from "./shop-directory.js";
 
 const DEFAULT_MODEL = "gemini-2.0-flash";
 
@@ -73,7 +73,7 @@ function directoryFallbackReply(userText) {
 }
 
 function systemInstruction() {
-  return `You are the Trade Square Mall concierge chatbot for WhatsApp and the mall website.
+  return `You are the Trade Square Mall concierge chatbot on WhatsApp.
 
 Personality:
 - Warm, clear, and concise — suitable for WhatsApp (short paragraphs, easy to scan).
@@ -156,7 +156,7 @@ async function generateMallReply(userText, options = {}) {
   }
 }
 
-module.exports = {
+export {
   generateMallReply,
   systemInstruction,
   directoryFallbackReply,

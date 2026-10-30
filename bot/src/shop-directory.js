@@ -1,6 +1,6 @@
 /**
  * Trade Square Mall directory — shops, dining, hours, amenities.
- * Used as grounded context for the Gemini WhatsApp / web chatbot.
+ * Used as grounded context for the Gemini WhatsApp chatbot (Baileys).
  */
 
 const MALL = {
@@ -268,7 +268,7 @@ TOURS
 Visitors can book a tour to walk 12 sqm and 25 sqm shop bays, the Training Center, and the rooftop cocktail bar / night club. Partitioning of shop spaces is free.`;
 }
 
-module.exports = {
+export {
   MALL,
   HOURS,
   SHOPS,

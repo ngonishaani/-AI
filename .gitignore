@@ -4,3 +4,9 @@ node_modules
 .env
 .env.local
 .env*.local
+
+# Baileys WhatsApp bot
+bot/node_modules/
+bot/auth_info_baileys/
+bot/.env
+bot/.env.local
