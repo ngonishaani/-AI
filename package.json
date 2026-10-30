@@ -2,8 +2,12 @@
   "name": "trade-square-mall",
   "version": "1.0.0",
   "private": true,
-  "description": "Trade Square Mall · Kwekwe",
+  "description": "Trade Square Mall · Kwekwe — site + WhatsApp/Gemini concierge",
   "scripts": {
-    "build": "echo 'static site — no build step'"
+    "build": "echo 'static site + /api serverless — no build step'",
+    "test:directory": "node -e \"const d=require('./lib/shop-directory'); console.log(d.allPlaces().length, d.findPlace('barber')[0].name)\""
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
