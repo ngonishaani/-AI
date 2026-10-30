@@ -50,7 +50,7 @@ export function shopMenuList(shop) {
     sections: [
       {
         title: "Products & services",
-        rows: shop.products.map((p) => {
+        rows: (shop.products || []).map((p) => {
           const priced = (p.variations || []).find((v) => v.price != null);
           return {
             title: p.name.slice(0, 24),
@@ -84,17 +84,20 @@ export function shopListLines() {
   return getShops()
     .map(
       (s, i) =>
-        `${i + 1}. *${s.name}*\n   ${s.floor} · ${s.number}\n   ${s.categories?.slice(0, 3).join(" · ") || s.description.slice(0, 60)}`
+        `${i + 1}. *${s.name}*\n   ${s.floor} · ${s.number}\n   ${
+          s.categories?.slice(0, 3).join(" · ") ||
+          String(s.description || "").slice(0, 60)
+        }`
     )
     .join("\n\n");
 }
 
 export function textMainMenu() {
-  return `Welcome to *${MARKETPLACE.name}* 🛍️\n${MARKETPLACE.tagline}\n\n*Shops*\n${shopListLines()}\n\n👉 Reply with a *number* or *shop name*\n👉 Or type what you want (e.g. DTF, hoodies, banners, website)\n👉 *about* = mall info`;
+  return `Welcome to *${MARKETPLACE.name}* 🛍️\n${MARKETPLACE.tagline}\n\n*Shops*\n${shopListLines()}\n\n👉 Reply with a *number* or *shop name*\n👉 Or just tell me what you want — I chat naturally\n👉 *about* = mall info`;
 }
 
 export function textShopMenu(shop) {
-  const lines = shop.products
+  const lines = (shop.products || [])
     .map((p, i) => {
       const priced = (p.variations || []).find((v) => v.price != null);
       return `${i + 1}. *${p.name}* — ${
@@ -112,44 +115,17 @@ export function aboutPlaceText() {
   return `*${PLACE_ABOUT.name}*\n${PLACE_ABOUT.about}\n\n📍 ${PLACE_ABOUT.address}\n🗺 ${PLACE_ABOUT.mapsUrl}\n\n*Mall hours*\n${hours}\n\n🌐 ${PLACE_ABOUT.website}\n\nReply *menu* to browse marketplace shops.`;
 }
 
-/** Match typed need → product across all shops */
-function matchTypedNeed(lower) {
-  if (/\b(dtf|gang\s*sheets?|transfers?|heat\s*press)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "dtf-sheets" };
-  }
-  if (
-    /\b(hoodies?|t-?shirts?|tees?\b|polos?|apparel|clothing|jerseys?|uniforms?)\b/i.test(
-      lower
-    )
-  ) {
-    return { type: "product", shopId: "royaleape", productId: "custom-apparel" };
-  }
-  if (/\b(gifts?|bottles?|totes?|hampers?|merch)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "custom-gifts" };
-  }
-  if (/\b(business\s*cards?|flyers?|brochures?)\b/i.test(lower)) {
-    return { type: "shop", shopId: "royaleape" };
-  }
-  if (
-    /\b(banners?|vinyl|flex|canvas|large\s*format|signage|posters?|stickers?|prints?|printing)\b/i.test(
-      lower
-    )
-  ) {
-    return { type: "product", shopId: "royaleape", productId: "large-format" };
-  }
-  if (/\b(websites?|web\s*sites?|web\s*packages?|seo|hosting)\b/i.test(lower)) {
-    return { type: "product", shopId: "royaleape", productId: "web-packages" };
-  }
-  return null;
-}
-
+/**
+ * Only hard-route explicit menu UI / shortcuts.
+ * Greetings and free-text needs go to Gemini for natural conversation.
+ */
 export function parseMenuSelection(text, { currentShopId } = {}) {
   const raw = String(text || "").trim();
   const lower = raw.toLowerCase();
 
-  if (!raw) return { type: "menu" };
+  if (!raw) return { type: "chat", text: "" };
 
-  // Interactive row ids (must run before greeting regexes — "shop:…" looks like "shop")
+  // Interactive row ids
   if (raw.startsWith("shop:")) return { type: "shop", shopId: raw.slice(5) };
   if (raw.startsWith("product:")) {
     const [, shopId, productId] = raw.split(":");
@@ -162,14 +138,15 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
     return { type: raw.startsWith("about") ? "about" : "menu" };
   }
 
+  // Explicit shop list only (greetings are conversational via Gemini)
+  if (/^(menu|shops?|list|marketplace|directory)\b/i.test(lower)) {
+    return { type: "menu" };
+  }
   if (
-    /^(menu|hi|hello|hey|start|shops?|list|marketplace|mhoro|masikati|good\s*(morning|afternoon|evening)|howdy|sup)\b/i.test(
+    /^(about|mall info|location|where is the mall|where is trade square)\b/i.test(
       lower
     )
   ) {
-    return { type: "menu" };
-  }
-  if (/^(about|mall|place|location|where is the mall|trade square)\b/i.test(lower)) {
     return { type: "about" };
   }
 
@@ -177,7 +154,7 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
   if (currentShopId && /^\d+$/.test(raw)) {
     const shop = getShop(currentShopId);
     const idx = Number(raw) - 1;
-    if (shop?.products[idx]) {
+    if (shop?.products?.[idx]) {
       return { type: "product", shopId: shop.id, productId: shop.products[idx].id };
     }
   }
@@ -192,45 +169,6 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
 
   if (/^(chat|whatsapp|order)\b/i.test(lower) && currentShopId) {
     return { type: "whatsapp", shopId: currentShopId };
-  }
-
-  // Typed need (product / service) — works without picking a shop first
-  const need = matchTypedNeed(lower);
-  if (need) return need;
-
-  // Fuzzy shop name (typing the shop alone is enough)
-  const shopHit = shops.find((s) => {
-    const name = s.name.toLowerCase();
-    return (
-      lower === s.id ||
-      lower === name ||
-      lower.includes(s.id) ||
-      lower.includes(name) ||
-      (s.id === "royaleape" &&
-        (lower.includes("royale ape") ||
-          lower.includes("royaleape") ||
-          /\broyale\b/.test(lower)))
-    );
-  });
-  if (shopHit) {
-    return { type: "shop", shopId: shopHit.id };
-  }
-
-  // Fuzzy product name across current shop, then all shops
-  const searchOrder = [
-    ...(currentShopId ? [getShop(currentShopId)].filter(Boolean) : []),
-    ...shops.filter((s) => s.id !== currentShopId),
-  ];
-  for (const shop of searchOrder) {
-    const product = shop.products.find(
-      (p) =>
-        lower.includes(p.id.replace(/-/g, " ")) ||
-        lower.includes(p.id) ||
-        lower.includes(p.name.toLowerCase()) ||
-        (Array.isArray(p.variations) &&
-          p.variations.some((v) => lower.includes(String(v.name || "").toLowerCase())))
-    );
-    if (product) return { type: "product", shopId: shop.id, productId: product.id };
   }
 
   return { type: "chat", text: raw };
