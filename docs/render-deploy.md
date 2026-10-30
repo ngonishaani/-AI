@@ -15,6 +15,8 @@ Blueprint file: [`render.yaml`](../render.yaml) at the repo root.
 
 ## 2. Create or update the service from the Blueprint
 
+**Existing `ai-mallbot` service:** GitHub merges do not always auto-redeploy. After these changes land on `main`, open the service → **Manual Deploy → Deploy latest commit**. Confirm env `SITE_ROOT=/opt/render/project/src/public`.
+
 1. Go to [https://dashboard.render.com](https://dashboard.render.com)
 2. **New → Blueprint** (or **Manual Deploy** / sync Blueprint on the existing service)
 3. Connect the GitHub repo `-AI`, branch `main`
