@@ -10,9 +10,6 @@ import { resolveAuthDir } from "./auth-path.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_FALLBACK = path.join(__dirname, "..", "data", "enrolled-shops.json");
 
-let cache = null;
-let cachePath = null;
-
 function catalogPath() {
   if (process.env.CATALOG_PATH?.trim()) {
     return path.resolve(process.env.CATALOG_PATH.trim());
@@ -33,32 +30,47 @@ function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
+/** Drop huge base64 uploads — they break Cloudflare/Render body limits and WhatsApp menus. */
+export function sanitizeShopsForStorage(shops) {
+  return (Array.isArray(shops) ? shops : []).map((shop) => {
+    if (!shop || typeof shop !== "object") return shop;
+    const next = { ...shop };
+    if (typeof next.image === "string" && next.image.startsWith("data:")) {
+      next.image = "";
+      next.imageOmitted = true;
+    }
+    if (Array.isArray(next.products)) {
+      next.products = next.products.map((product) => {
+        if (!product || typeof product !== "object") return product;
+        if (typeof product.image === "string" && product.image.startsWith("data:")) {
+          return { ...product, image: "", imageOmitted: true };
+        }
+        return product;
+      });
+    }
+    return next;
+  });
+}
+
 export function loadEnrolledRaw() {
   const filePath = catalogPath();
-  if (cache && cachePath === filePath) return cache;
   try {
     if (!fs.existsSync(filePath)) {
-      cache = { shops: [], updatedAt: null };
-      cachePath = filePath;
-      return cache;
+      return { shops: [], updatedAt: null };
     }
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
     const shops = Array.isArray(parsed?.shops) ? parsed.shops : Array.isArray(parsed) ? parsed : [];
-    cache = {
+    return {
       shops,
       updatedAt: parsed?.updatedAt || null,
     };
-    cachePath = filePath;
-    return cache;
   } catch {
-    cache = { shops: [], updatedAt: null };
-    cachePath = filePath;
-    return cache;
+    return { shops: [], updatedAt: null };
   }
 }
 
 export function saveEnrolledRaw(shops) {
-  const list = Array.isArray(shops) ? shops : [];
+  const list = sanitizeShopsForStorage(shops);
   const filePath = catalogPath();
   ensureDir(filePath);
   const payload = {
@@ -66,8 +78,6 @@ export function saveEnrolledRaw(shops) {
     updatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
-  cache = payload;
-  cachePath = filePath;
   return payload;
 }
 

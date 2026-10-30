@@ -13,9 +13,10 @@ import {
   listNormalizedEnrolled,
 } from "./catalog-store.js";
 import { getShops } from "./marketplace.js";
+import { textMainMenu } from "./menus.js";
 
 /**
- *   GET  /health /status /catalog / /qr /qr.png /pair
+ *   GET  /health /status /catalog /menu-preview / /qr /qr.png /pair
  *   PUT  /catalog   (enrol page sync)
  *   POST /pair  /relink
  */
@@ -34,7 +35,10 @@ export function startHttpServer({
     const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
     const pathName = url.pathname;
 
-    if (req.method === "OPTIONS" && pathName.startsWith("/catalog")) {
+    if (
+      req.method === "OPTIONS" &&
+      (pathName.startsWith("/catalog") || pathName === "/menu-preview")
+    ) {
       return sendCors(res, 204, "");
     }
 
@@ -42,6 +46,23 @@ export function startHttpServer({
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("ok");
       return;
+    }
+
+    if (pathName === "/menu-preview" && req.method === "GET") {
+      const shops = getShops();
+      return sendCorsJson(res, 200, {
+        ok: true,
+        liveCount: shops.length,
+        shops: shops.map((s) => ({
+          id: s.id,
+          name: s.name,
+          floor: s.floor,
+          number: s.number,
+          enrolled: Boolean(s.enrolled),
+          productCount: s.products?.length || 0,
+        })),
+        menuText: textMainMenu(),
+      });
     }
 
     if (pathName === "/catalog" && req.method === "GET") {
@@ -85,8 +106,9 @@ export function startHttpServer({
           });
         }
         const saved = saveEnrolledRaw(shops);
+        const omitted = saved.shops.filter((s) => s?.imageOmitted).length;
         logger.info(
-          { count: saved.shops.length, updatedAt: saved.updatedAt },
+          { count: saved.shops.length, updatedAt: saved.updatedAt, omittedImages: omitted },
           "Marketplace catalog updated from enrol sync"
         );
         return sendCorsJson(res, 200, {
@@ -94,6 +116,8 @@ export function startHttpServer({
           count: saved.shops.length,
           updatedAt: saved.updatedAt,
           liveCount: getShops().length,
+          omittedImages: omitted,
+          menuText: textMainMenu(),
         });
       } catch (err) {
         logger.error({ err: err?.message || err }, "catalog sync failed");

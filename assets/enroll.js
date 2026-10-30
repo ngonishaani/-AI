@@ -36,6 +36,29 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(shops));
   }
 
+  /** Bot sync cannot carry multi‑MB data-URL uploads (CDN body limits). */
+  function shopsForBotSync(shops) {
+    let omittedImages = 0;
+    const cleaned = (Array.isArray(shops) ? shops : []).map((shop) => {
+      const next = { ...shop };
+      if (typeof next.image === "string" && next.image.startsWith("data:")) {
+        next.image = "";
+        omittedImages += 1;
+      }
+      if (Array.isArray(next.products)) {
+        next.products = next.products.map((product) => {
+          if (product && typeof product.image === "string" && product.image.startsWith("data:")) {
+            omittedImages += 1;
+            return { ...product, image: "" };
+          }
+          return product;
+        });
+      }
+      return next;
+    });
+    return { shops: cleaned, omittedImages };
+  }
+
   async function syncCatalogToBot(shops) {
     if (!CATALOG_URL) return { ok: false, skipped: true };
     const headers = { "Content-Type": "application/json" };
@@ -43,10 +66,13 @@
       headers.Authorization = `Bearer ${CATALOG_TOKEN}`;
       headers["X-Catalog-Token"] = CATALOG_TOKEN;
     }
+    const prepared = shopsForBotSync(shops);
     return fetch(CATALOG_URL, {
       method: "PUT",
       headers,
-      body: JSON.stringify({ shops }),
+      body: JSON.stringify({ shops: prepared.shops }),
+      mode: "cors",
+      cache: "no-store",
     })
       .then(async (res) => {
         let data = null;
@@ -58,9 +84,34 @@
         if (!res.ok) {
           throw new Error(data?.error || `Bot sync failed (${res.status})`);
         }
-        return { ok: true, data };
+        return {
+          ok: true,
+          data,
+          omittedImages: prepared.omittedImages + (data?.omittedImages || 0),
+        };
       })
       .catch((err) => ({ ok: false, error: err?.message || String(err) }));
+  }
+
+  async function hydrateFromBot() {
+    if (!CATALOG_URL) return;
+    try {
+      const res = await fetch(CATALOG_URL, { method: "GET", mode: "cors", cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const remote = Array.isArray(data?.shops) ? data.shops : [];
+      if (!remote.length && !loadShops().length) return;
+      // Prefer the bot catalog as source of truth when it has shops
+      if (remote.length) {
+        saveShops(remote);
+        renderEnrolled();
+        setStatus(
+          `Loaded ${remote.length} enrolled shop${remote.length === 1 ? "" : "s"} from WhatsApp bot.`
+        );
+      }
+    } catch {
+      // Offline / bot waking — keep localStorage
+    }
   }
 
   async function saveShopsAndConfirm(shops, successMessage) {
@@ -70,10 +121,13 @@
     const result = await syncCatalogToBot(shops);
     if (result.ok) {
       const live = result.data?.liveCount;
+      const omitted = result.omittedImages
+        ? " Uploaded photos stay on this device — use an image URL for WhatsApp."
+        : "";
       setStatus(
         live != null
-          ? `${successMessage} Updated on WhatsApp bot (${live} shop${live === 1 ? "" : "s"} live).`
-          : `${successMessage} Updated on WhatsApp bot.`
+          ? `${successMessage} Updated on WhatsApp bot (${live} shop${live === 1 ? "" : "s"} live).${omitted}`
+          : `${successMessage} Updated on WhatsApp bot.${omitted}`
       );
     } else if (!result.skipped) {
       setStatus(
@@ -366,10 +420,13 @@
     const result = await syncCatalogToBot(shops);
     if (result.ok) {
       const live = result.data?.liveCount;
+      const omitted = result.omittedImages
+        ? " Uploaded photos stay on this device — use an image URL for WhatsApp."
+        : "";
       setStatus(
         live != null
-          ? `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} · ${live} live on bot.`
-          : `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} to the bot.`
+          ? `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} · ${live} live on bot.${omitted}`
+          : `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} to the bot.${omitted}`
       );
     } else {
       setStatus(`Bot sync failed: ${result.error}`, true);
@@ -385,4 +442,5 @@
 
   addProduct();
   renderEnrolled();
+  hydrateFromBot();
 })();
