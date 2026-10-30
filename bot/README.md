@@ -10,7 +10,7 @@ Baileys (WhatsApp Web multi-device socket)  ← always-on Node process
        │
        ├─ marketplace menus (shops → products → prices / images / store WA)
        ├─ Gemini (open-ended product questions)
-       └─ node-cron (health check every 5 min, hourly presence, optional daily broadcast)
+       └─ node-cron (reconnect every 2 min, /health keep-alive every 3 min, presence every 15 min)
 ```
 
 Trade Square Mall “about” (location, mall hours) is only sent when the customer asks about the place.

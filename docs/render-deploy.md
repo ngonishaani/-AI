@@ -29,11 +29,27 @@ The Blueprint sets:
 - `rootDir: bot` · Build `npm install` · Start `npm start`
 - Mall site files live in **`bot/public`** (synced from the repo root via `bot/scripts/sync-site.sh`)
 - `SITE_ROOT=/opt/render/project/src/public`
+- `KEEP_ALIVE_URL=https://ai-mallbot.onrender.com/health`
 - Disk at `/var/data` (WhatsApp session survives redeploys)
 - `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`
 - Health check: `/health`
+- Cron job **trade-square-bot-keepalive** every 5 minutes → `node scripts/keep-alive.mjs`
 
 After changing homepage / shop / enroll pages at the repo root, run `bot/scripts/sync-site.sh` before committing so Render gets the update.
+
+### Keep the bot alive (cron)
+
+Inside the web process, node-cron already:
+
+1. Reconnects WhatsApp every **2 minutes** if the socket is down  
+2. Self-pings `/health` every **3 minutes**  
+3. Sends a presence poke every **15 minutes**
+
+The Blueprint cron job also pings `/health` from outside every **5 minutes**. After merging, **Manual Deploy** the web service and **sync the Blueprint** (or create the Cron Job once) so keep-alive runs.
+
+If you prefer an external pinger instead: point [cron-job.org](https://cron-job.org) at `https://ai-mallbot.onrender.com/health` every 5 minutes.
+
+Use a **Starter** (or higher) web plan so WhatsApp is not killed by free-tier sleep.
 
 ## 3. Verify the website
 
