@@ -7,15 +7,15 @@ import {
 } from "./pairing.js";
 
 /**
- * Render HTTP surface — QR link (primary) + optional phone pairing.
- *   GET  /health /status / /qr /qr.png
- *   POST /pair
+ *   GET  /health /status / /qr /qr.png /pair
+ *   POST /pair  /relink
  */
 export function startHttpServer({
   getStatus,
   getSock,
   getAuthInfo,
   getLatestQr,
+  forceRelink,
   logger,
   isGeminiConfigured,
 }) {
@@ -53,19 +53,38 @@ export function startHttpServer({
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,
-          tip: auth.onRenderDisk
-            ? "Session is on persistent disk — redeploys should not require pairing again."
-            : "WARNING: Attach a Render Disk at /var/data and set BAILEYS_AUTH_DIR=/var/data/auth_info_baileys or you will re-pair every deploy.",
         })
       );
       return;
+    }
+
+    if (pathName === "/relink" && (req.method === "POST" || req.method === "GET")) {
+      try {
+        await forceRelink?.();
+        // Give Baileys a moment to emit QR
+        await sleep(2500);
+        if (req.method === "GET") {
+          res.writeHead(302, { Location: "/qr?fresh=1" });
+          res.end();
+          return;
+        }
+        return sendJson(res, 200, {
+          ok: true,
+          qrPending: Boolean(getLatestQr?.()),
+          status: getStatus(),
+          auth: getAuthInfo?.(),
+        });
+      } catch (err) {
+        logger.error({ err: err?.message || err }, "relink failed");
+        return sendJson(res, 500, { ok: false, error: err?.message || String(err) });
+      }
     }
 
     if (pathName === "/qr.png") {
       const qr = getLatestQr?.();
       if (!qr) {
         res.writeHead(404, { "Content-Type": "text/plain" });
-        res.end("No QR yet — refresh in a few seconds");
+        res.end("No QR yet — open /relink then refresh");
         return;
       }
       try {
@@ -92,9 +111,8 @@ export function startHttpServer({
     if (pathName === "/pair" && req.method === "POST") {
       const body = await readBody(req);
       let phone = "";
-      if (typeof body === "object" && body) {
-        phone = body.phone || body.number || "";
-      } else if (typeof body === "string") {
+      if (typeof body === "object" && body) phone = body.phone || body.number || "";
+      else if (typeof body === "string") {
         try {
           phone = JSON.parse(body).phone;
         } catch {
@@ -105,16 +123,23 @@ export function startHttpServer({
       if (!normalized) {
         return sendJson(res, 400, { ok: false, error: getPairingState().error });
       }
+
       const sock = getSock?.();
+      // Prefer waiting for QR event; still try now if socket exists
       if (sock && !sock.authState?.creds?.registered) {
         await maybeRequestPairingCode(sock, { logger });
       }
+
       const pair = getPairingState();
       return sendJson(res, 200, {
         ok: true,
         phone: pair.phone,
         pairingCode: pair.code,
+        qrPending: Boolean(getLatestQr?.()),
         error: pair.error,
+        hint: pair.code
+          ? "Enter this code on your phone now"
+          : "Keep this page open — code appears when WhatsApp is ready (or use /qr instead)",
       });
     }
 
@@ -125,7 +150,8 @@ export function startHttpServer({
       const status = getStatus();
       const auth = getAuthInfo?.() || {};
       const qr = getLatestQr?.();
-      const wantPhone = pathName === "/pair" || url.searchParams.get("mode") === "phone";
+      const wantPhone =
+        pathName === "/pair" || url.searchParams.get("mode") === "phone";
 
       if (status === "open") {
         res.writeHead(200, {
@@ -136,20 +162,18 @@ export function startHttpServer({
           page(
             "Trade Square WhatsApp bot",
             `<p class="ok">Connected. Message the linked WhatsApp number — the mall bot will reply.</p>
-             <p class="muted">Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO"}</strong><br/>
-             <code>${escapeHtml(auth.authDir || "")}</code></p>`
+             <p class="muted">Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO"}</strong></p>`
           )
         );
         return;
       }
 
-      // Phone pairing page (optional fallback)
       if (wantPhone) {
         const sock = getSock?.();
-        const pair = getPairingState();
+        const pair0 = getPairingState();
         if (
-          pair.phone &&
-          !pair.code &&
+          pair0.phone &&
+          !pair0.code &&
           sock &&
           !sock.authState?.creds?.registered
         ) {
@@ -159,13 +183,19 @@ export function startHttpServer({
         const codeBlock = fresh.code
           ? `<div class="code-box"><span class="code">${escapeHtml(fresh.code)}</span></div>
              <ol class="steps">
-               <li>WhatsApp → <strong>Linked Devices</strong> → Link a device</li>
-               <li>Tap <strong>Link with phone number instead</strong></li>
+               <li>WhatsApp → Linked Devices → Link a device</li>
+               <li><strong>Link with phone number instead</strong></li>
                <li>Enter the code above</li>
              </ol>
              <script>setTimeout(()=>location.reload(),8000)</script>`
-          : `<p class="muted">${fresh.phone ? "Waiting for code…" : "Enter number with country code."}</p>
-             ${fresh.phone ? `<script>setTimeout(()=>location.reload(),4000)</script>` : ""}`;
+          : `<p class="muted">${
+              fresh.phone
+                ? qr
+                  ? "WhatsApp is ready — requesting code…"
+                  : "Waiting for WhatsApp connection… (QR also available)"
+                : "Enter number with country code."
+            }</p>
+             ${fresh.phone ? `<script>setTimeout(()=>location.reload(),3000)</script>` : ""}`;
 
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
@@ -181,7 +211,7 @@ export function startHttpServer({
                <button type="submit">Get pairing code</button>
              </form>
              ${codeBlock}
-             <p class="muted"><a href="/qr">← Back to QR code</a></p>
+             <p class="muted"><a href="/qr">← Back to QR code</a> · <a href="/relink">Reset &amp; new QR</a></p>
              <script>
                document.getElementById('f').addEventListener('submit', async function(e){
                  e.preventDefault();
@@ -191,8 +221,7 @@ export function startHttpServer({
                  try {
                    var r=await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
                    var j=await r.json();
-                   if(j.pairingCode||!j.error) location.reload();
-                   else { alert(j.error||'Failed'); btn.disabled=false; btn.textContent='Get pairing code'; }
+                   location.reload();
                  } catch(err){ alert('Request failed'); btn.disabled=false; btn.textContent='Get pairing code'; }
                });
              </script>`
@@ -201,7 +230,7 @@ export function startHttpServer({
         return;
       }
 
-      // Primary: QR page
+      // Primary QR page
       let qrHtml;
       if (qr) {
         try {
@@ -212,26 +241,27 @@ export function startHttpServer({
             color: { dark: "#000000", light: "#FFFFFF" },
           });
           qrHtml = `
-            <p class="tip"><strong>Open this page on a computer</strong>, then scan with your phone. Do not scan from the same phone screen.</p>
+            <p class="tip"><strong>Open on a computer.</strong> Scan with your WhatsApp phone (not this same screen).</p>
             <div class="qr-wrap"><img class="qr" alt="WhatsApp QR" src="${dataUrl}" width="260" height="260" /></div>
             <p><a class="btn" href="/qr.png" target="_blank" rel="noopener">Open QR image only</a></p>
             <ol class="steps">
-              <li>Phone: <strong>WhatsApp → Linked Devices → Link a device</strong></li>
-              <li>Point camera at this QR</li>
+              <li>WhatsApp → <strong>Linked Devices</strong> → Link a device</li>
+              <li>Scan this QR</li>
             </ol>
-            <p class="muted">QR refreshes ~every 20s. Page reloads every 8s.</p>
             <script>setTimeout(()=>location.reload(),8000)</script>`;
         } catch (err) {
           logger.error({ err: err?.message || err }, "qr page render failed");
-          qrHtml = `<p class="err">Could not draw QR. Try <a href="/qr.png">/qr.png</a>.</p>`;
+          qrHtml = `<p class="err">Could not draw QR. Try <a href="/qr.png">/qr.png</a> or <a href="/relink">reset</a>.</p>`;
         }
-      } else if (auth.sessionRegistered) {
-        qrHtml = `<p class="ok">Saved session found — reconnecting (no scan needed)…</p>
-                  <p class="muted">If this hangs more than a minute, check Render logs.</p>
-                  <script>setTimeout(()=>location.reload(),4000)</script>`;
       } else {
-        qrHtml = `<p class="muted">Waiting for QR from WhatsApp…</p>
-                  <script>setTimeout(()=>location.reload(),3000)</script>`;
+        qrHtml = `
+          <p class="muted">${
+            auth.sessionRegistered
+              ? "Saved session reconnecting… if this never shows a QR, reset below."
+              : "Waiting for QR from WhatsApp…"
+          }</p>
+          <p><a class="btn" href="/relink">Reset session &amp; get new QR</a></p>
+          <script>setTimeout(()=>location.reload(),3000)</script>`;
       }
 
       res.writeHead(200, {
@@ -242,8 +272,8 @@ export function startHttpServer({
         page(
           "Scan QR to link WhatsApp",
           `${qrHtml}
-           <p class="muted">Disk: <strong>${auth.onRenderDisk ? "persistent ✓" : "NOT persistent"}</strong>
-           · <a href="/pair">Use phone number instead</a></p>`
+           <p class="muted">Stuck? <a href="/relink">Reset &amp; new QR</a>
+           · Disk: <strong>${auth.onRenderDisk ? "persistent ✓" : "NOT persistent"}</strong></p>`
         )
       );
       return;
@@ -258,6 +288,10 @@ export function startHttpServer({
   });
 
   return server;
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function sendJson(res, code, obj) {

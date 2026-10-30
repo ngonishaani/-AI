@@ -90,3 +90,17 @@ export function getAuthStatus(authDir) {
     hasCredsJson: files.includes("creds.json"),
   };
 }
+
+/** Wipe Baileys session files so a fresh QR can be generated. */
+export function clearAuthSession(authDir, logger) {
+  const files = listAuthFiles(authDir);
+  for (const name of files) {
+    try {
+      fs.rmSync(path.join(authDir, name), { recursive: true, force: true });
+    } catch (err) {
+      logger?.warn({ name, err: err?.message || err }, "failed deleting auth file");
+    }
+  }
+  logger?.warn({ authDir, removed: files.length }, "WhatsApp session cleared — new QR required");
+  return files.length;
+}

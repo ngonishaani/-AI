@@ -10,8 +10,13 @@ import pino from "pino";
 import { generateMallReply, isGeminiConfigured } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
-import { clearPairingCode, maybeRequestPairingCode } from "./pairing.js";
 import {
+  clearPairingCode,
+  hasPendingPhone,
+  maybeRequestPairingCode,
+} from "./pairing.js";
+import {
+  clearAuthSession,
   ensureAuthDir,
   getAuthStatus,
   resolveAuthDir,
@@ -142,15 +147,13 @@ async function connectToWhatsApp() {
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      // QR is the primary link method. Keep latest QR for /qr page.
-      // Phone pairing only runs when user submitted /pair (pending phone set)
-      // or WHATSAPP_LINK_MODE=phone — requesting a code on every QR breaks scanning.
+      // Always publish QR for /qr. If user asked for phone pairing, also request code.
       if (qr) {
         setLatestQr(qr);
-        logger.info("QR ready — open /qr on a computer and scan with your phone");
+        logger.info("QR ready — open /qr (computer) and scan, or wait for pairing code on /pair");
         if (
-          process.env.WHATSAPP_LINK_MODE === "phone" &&
-          !sock?.authState?.creds?.registered
+          !sock?.authState?.creds?.registered &&
+          (hasPendingPhone() || process.env.WHATSAPP_LINK_MODE === "phone")
         ) {
           try {
             await maybeRequestPairingCode(sock, { logger });
@@ -251,11 +254,31 @@ async function reconnect() {
   await connectToWhatsApp();
 }
 
+/** Clear broken/stale session and force a brand-new QR. */
+async function forceRelink() {
+  logger.warn("Force relink requested — clearing session and reconnecting");
+  clearPairingCode();
+  clearLatestQr();
+  try {
+    sock?.end?.(undefined);
+  } catch {
+    /* ignore */
+  }
+  sock = null;
+  connectionStatus = "close";
+  reconnecting = false;
+  clearAuthSession(AUTH_DIR, logger);
+  await connectToWhatsApp();
+  return getAuthStatus(AUTH_DIR);
+}
+
 httpServer = startHttpServer({
   getStatus,
   getSock,
   getAuthInfo,
   getLatestQr,
+  getPairingState,
+  forceRelink,
   logger,
   isGeminiConfigured,
 });

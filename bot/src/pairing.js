@@ -44,10 +44,14 @@ export function clearPairingCode() {
  * @param {{ logger?: import('pino').Logger }} opts
  */
 export async function maybeRequestPairingCode(sock, { logger } = {}) {
-  if (!sock) return null;
+  if (!sock) {
+    lastError = "WhatsApp socket not ready yet — wait a few seconds and retry";
+    return null;
+  }
   if (sock.authState?.creds?.registered) return null;
   if (!pendingPhone) return null;
   if (requesting) return latestCode;
+  if (latestCode) return latestCode;
 
   requesting = true;
   try {
@@ -64,12 +68,23 @@ export async function maybeRequestPairingCode(sock, { logger } = {}) {
     );
     return latestCode;
   } catch (err) {
-    lastError = err?.message || String(err);
-    logger?.error({ err: lastError, phone: pendingPhone }, "pairing code failed");
+    const msg = err?.message || String(err);
+    // Not ready yet is normal before the first QR event — keep waiting quietly
+    if (/not connected|connection closed|timed out|401|428/i.test(msg)) {
+      lastError = null;
+      logger?.info({ err: msg }, "pairing not ready yet — will retry");
+    } else {
+      lastError = msg;
+      logger?.error({ err: msg, phone: pendingPhone }, "pairing code failed");
+    }
     return null;
   } finally {
     requesting = false;
   }
+}
+
+export function hasPendingPhone() {
+  return Boolean(pendingPhone);
 }
 
 function formatCode(code) {
