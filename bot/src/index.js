@@ -35,6 +35,8 @@ import {
   textShopMenu,
   whatsappLinkText,
 } from "./menus.js";
+import { resolveLocalMediaPath } from "./catalog-store.js";
+import fs from "node:fs";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -107,8 +109,56 @@ function extractText(msg) {
   ).trim();
 }
 
+function bufferFromDataUrl(dataUrl) {
+  const match = String(dataUrl || "").match(
+    /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/
+  );
+  if (!match) return null;
+  try {
+    return Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+  } catch {
+    return null;
+  }
+}
+
+/** Send a shop/product photo. Prefers local media files, then data URLs, then remote URLs. */
 async function sendImage(jid, url, caption) {
   if (!url || !sock) return false;
+
+  const localPath = resolveLocalMediaPath(url);
+  if (localPath) {
+    try {
+      const buf = fs.readFileSync(localPath);
+      await sock.sendMessage(jid, {
+        image: buf,
+        caption: caption || undefined,
+      });
+      return true;
+    } catch (err) {
+      logger.warn(
+        { err: err?.message || err, localPath },
+        "local media send failed — trying other sources"
+      );
+    }
+  }
+
+  if (String(url).startsWith("data:")) {
+    const buf = bufferFromDataUrl(url);
+    if (buf?.length) {
+      try {
+        await sock.sendMessage(jid, {
+          image: buf,
+          caption: caption || undefined,
+        });
+        return true;
+      } catch (err) {
+        logger.warn({ err: err?.message || err }, "data-URL image send failed");
+        return false;
+      }
+    }
+    return false;
+  }
+
   try {
     await sock.sendMessage(jid, {
       image: { url },
@@ -170,7 +220,10 @@ async function sendMainMenu(jid) {
 async function sendShopCard(jid, shop) {
   setChatShop(jid, shop.id);
   const caption = shopSummary(shop);
-  const sent = await sendImage(jid, shop.image, caption);
+  // Always try the shop photo first when opening a shop
+  const sent = shop.image
+    ? await sendImage(jid, shop.image, caption)
+    : false;
   if (!sent) {
     await sock.sendMessage(jid, { text: caption });
   }
