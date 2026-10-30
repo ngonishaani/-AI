@@ -26,14 +26,16 @@ Trade Square Mall “about” (location, mall hours) is only sent when the custo
 Full steps: [docs/render-deploy.md](../docs/render-deploy.md)
 
 1. Push this repo and open [Render Dashboard](https://dashboard.render.com) → **New → Blueprint**
-2. Select repo `-AI` and branch with `render.yaml`
+2. Select repo `-AI` and branch with `render.yaml` (deploys **repo root** — mall site + bot)
 3. Set `GEMINI_API_KEY` when prompted (Starter plan — Free sleeps and drops WhatsApp)
-4. After deploy: open `https://<service>.onrender.com/`
-5. Enter your number (country code, digits only) → **Get pairing code**
-6. Phone: **WhatsApp → Linked Devices → Link a device → Link with phone number instead** → enter the code
-7. Message that WhatsApp number — reply *menu* for shops (sample: RoyaleApe) + Gemini replies
+4. After deploy:
+   - Mall site: `https://<service>.onrender.com/` and `/shop`
+   - WhatsApp QR: `https://<service>.onrender.com/qr`
+5. Phone: **WhatsApp → Linked Devices → Link a device** → scan the QR
+6. Message that WhatsApp number — reply *menu* for enrolled shops + Gemini replies
 
 Session files live on the Render disk at `/var/data/auth_info_baileys` so redeploys keep the link.
+Clear any old **Root Directory = bot** override so website files are included in the deploy.
 
 ## Local setup
 

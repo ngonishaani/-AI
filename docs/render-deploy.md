@@ -1,31 +1,45 @@
-# Deploy the WhatsApp bot on Render
+# Deploy Trade Square on Render
 
-The mall **website** stays on Vercel. The **WhatsApp bot** (`/bot`) deploys to Render as an always-on web service with a persistent disk for the Baileys session.
+The **mall website** (`/`, `/shop`, `/enroll`, assets) and the **WhatsApp bot** both run on one Render web service. The site is no longer served from Vercel.
+
+Service hostname today: `https://ai-mallbot.onrender.com`  
+Enrolled shops: `https://ai-mallbot.onrender.com/shop`  
+WhatsApp QR (linking only): `https://ai-mallbot.onrender.com/qr`
+
+Point **tradesquaremall.com** at this Render service (custom domain in the Render dashboard) when you cut over from Vercel.
 
 ## 1. Push / open the PR branch
 
 Repo: `ngonishaani/-AI`  
-Branch with the bot: `cursor/whatsapp-gemini-chatbot-3831` (or `main` after merge)  
 Blueprint file: [`render.yaml`](../render.yaml) at the repo root.
 
-## 2. Create the service from the Blueprint
+## 2. Create or update the service from the Blueprint
 
 1. Go to [https://dashboard.render.com](https://dashboard.render.com)
-2. **New → Blueprint**
-3. Connect the GitHub repo `-AI`
-4. Select branch `cursor/whatsapp-gemini-chatbot-3831` (or `main`)
-5. Render reads `render.yaml` and proposes **trade-square-whatsapp-bot**
-6. When prompted for `GEMINI_API_KEY`, paste your Google AI Studio key
-7. Apply / create (use **Starter** plan — Free sleeps and will drop WhatsApp)
+2. **New → Blueprint** (or **Manual Deploy** / sync Blueprint on the existing service)
+3. Connect the GitHub repo `-AI`, branch `main`
+4. Render reads `render.yaml` and proposes **trade-square-whatsapp-bot**
+5. When prompted for `GEMINI_API_KEY`, paste your Google AI Studio key
+6. Apply / create (use **Starter** plan — Free sleeps and will drop WhatsApp)
 
-The Blueprint already sets:
+The Blueprint sets:
 
-- `rootDir: bot`
-- disk at `/var/data` (session survives redeploys)
+- Build: `npm install --prefix bot` (repo root deploy so website files are included)
+- Start: `npm start --prefix bot`
+- `SITE_ROOT=/opt/render/project/src` (serves `index.html`, `shop/`, `enroll/`, `assets/`)
+- Disk at `/var/data` (WhatsApp session survives redeploys)
 - `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`
-- health check: `/health`
+- Health check: `/health`
 
-## 3. Link WhatsApp (QR — recommended)
+> If this service previously used `rootDir: bot`, clear that override so the **repo root** is deployed. Otherwise `/shop` will 404.
+
+## 3. Verify the website
+
+1. `https://<service>.onrender.com/` — mall homepage  
+2. `https://<service>.onrender.com/shop` — enrolled shops from `GET /catalog`  
+3. `https://<service>.onrender.com/enroll/` — enrol form (syncs with `PUT /catalog`)
+
+## 4. Link WhatsApp (QR — recommended)
 
 1. Wait for the deploy to go **Live**
 2. On a **computer**, open `https://<your-service>.onrender.com/qr`
@@ -36,7 +50,7 @@ Tips: raise brightness; open `/qr.png` for a clean image; don’t scan from the 
 
 Optional fallback: `/pair` for phone-number linking (`WHATSAPP_LINK_MODE=phone`).
 
-## 4. Turn on Gemini (Shona + English)
+## 5. Turn on Gemini (Shona + English)
 
 Without this, the bot only uses simple directory keyword replies.
 
@@ -47,17 +61,15 @@ Without this, the bot only uses simple directory keyword replies.
 3. **Save** → **Manual Deploy** (so the new env loads)
 4. Open `https://<service>.onrender.com/status` — should show `"geminiConfigured": true`
 
-## 5. Test
+## 6. Custom domain (replace Vercel)
 
-Message the linked WhatsApp number. Try:
+1. Render → service → **Settings → Custom Domains** → add `www.tradesquaremall.com` (and apex if needed)
+2. Update DNS as Render instructs
+3. Remove or pause the Vercel project for this domain once Render serves HTTPS
 
-- `hours` / `Nguva yekuvhura ndiyani?`
-- `shops on ground floor` / `Pane barber here?`
-- `Masikati, ndinoda rooftop lounge`
+Catalog calls can keep using `https://ai-mallbot.onrender.com/catalog`, or switch the site meta `tsm-catalog-url` to `/catalog` once the public site and API share a host.
 
-Replies should feel natural in English, Shona, or a mix.
-
-## 5. Stop re-pairing on every redeploy
+## 7. Stop re-pairing on every redeploy
 
 If you must pair again after each deploy, the WhatsApp session is **not** on a disk.
 
@@ -70,22 +82,24 @@ If you must pair again after each deploy, the WhatsApp session is **not** on a d
 
 After that, redeploys reconnect automatically (no pairing).
 
-## 6. Important
+## 8. Important
 
 | Do | Don’t |
 |----|--------|
+| Deploy from **repo root** (website + bot) | Keep `rootDir: bot` (site files missing) |
 | Use Starter (or higher) so the service stays up | Use Free web (sleeps → WhatsApp disconnects) |
 | Keep the 1GB disk at `/var/data` | Delete the disk (forces pairing again) |
 | Set `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys` | Leave auth in the repo folder (wiped each deploy) |
 | Set `GEMINI_API_KEY` in Render env | Commit `.env` or `auth_info_baileys` |
+| Use `/qr` for WhatsApp linking | Expect the old bot dashboard at `/` (that’s the mall site now) |
 
 ## Manual create (without Blueprint)
 
 **New → Web Service** → same repo →:
 
-- Root directory: `bot`
-- Build: `npm install`
-- Start: `npm start`
+- Root directory: *(leave empty / repo root)*
+- Build: `npm install --prefix bot`
+- Start: `npm start --prefix bot`
 - Instance: Starter+
 - Advanced → disk mount `/var/data`, 1 GB
-- Env: `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`, `GEMINI_API_KEY=…`, `NODE_VERSION=20`
+- Env: `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys`, `SITE_ROOT=/opt/render/project/src`, `GEMINI_API_KEY=…`, `NODE_VERSION=20`
