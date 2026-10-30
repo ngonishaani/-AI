@@ -1,5 +1,4 @@
 import "dotenv/config";
-import fs from "node:fs";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
@@ -8,8 +7,6 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import pino from "pino";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { generateMallReply, isGeminiConfigured } from "./gemini.js";
 import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
@@ -17,17 +14,27 @@ import {
   clearPairingCode,
   maybeRequestPairingCode,
 } from "./pairing.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR =
-  process.env.BAILEYS_AUTH_DIR ||
-  path.join(__dirname, "..", "auth_info_baileys");
-
-fs.mkdirSync(AUTH_DIR, { recursive: true });
+import {
+  ensureAuthDir,
+  getAuthStatus,
+  resolveAuthDir,
+} from "./auth-path.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
 }).child({ app: "trade-square-bot" });
+
+const AUTH_DIR = resolveAuthDir();
+const authMeta = ensureAuthDir(AUTH_DIR, logger);
+logger.info(
+  {
+    authDir: AUTH_DIR,
+    onRenderDisk: authMeta.onRenderDisk,
+    existingAuthFiles: authMeta.files.length,
+    sessionRegistered: getAuthStatus(AUTH_DIR).sessionRegistered,
+  },
+  "WhatsApp auth store"
+);
 
 let sock = null;
 let connectionStatus = "close";
@@ -101,6 +108,14 @@ async function connectToWhatsApp() {
 
   try {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const alreadyRegistered = Boolean(state.creds?.registered);
+    logger.info(
+      { alreadyRegistered, authDir: AUTH_DIR },
+      alreadyRegistered
+        ? "Restoring saved WhatsApp session (no pairing needed)"
+        : "No saved session — pairing required once"
+    );
+
     const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
@@ -116,13 +131,24 @@ async function connectToWhatsApp() {
       generateHighQualityLinkPreview: false,
     });
 
-    sock.ev.on("creds.update", saveCreds);
+    // Persist every creds/keys update to the disk-backed auth folder
+    sock.ev.on("creds.update", async () => {
+      try {
+        await saveCreds();
+        logger.debug("creds saved to persistent auth dir");
+      } catch (err) {
+        logger.error({ err: err?.message || err }, "failed to save WhatsApp creds");
+      }
+    });
 
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
-      // Pairing-code mode: when WhatsApp emits QR readiness, request code instead.
-      if (qr || connection === "connecting") {
+      // Only request pairing when NOT already registered
+      if (
+        !sock?.authState?.creds?.registered &&
+        (qr || connection === "connecting")
+      ) {
         try {
           await maybeRequestPairingCode(sock, { logger });
         } catch (err) {
@@ -137,7 +163,16 @@ async function connectToWhatsApp() {
 
       if (connection === "open") {
         clearPairingCode();
-        logger.info("WhatsApp connected — Trade Square Mall bot is live");
+        // Force a creds flush after successful link/reconnect
+        try {
+          await saveCreds();
+        } catch {
+          /* ignore */
+        }
+        logger.info(
+          { authDir: AUTH_DIR, ...getAuthStatus(AUTH_DIR) },
+          "WhatsApp connected — session saved for future redeploys"
+        );
       }
 
       if (connection === "close") {
@@ -164,7 +199,7 @@ async function connectToWhatsApp() {
         }
         clearPairingCode();
         logger.error(
-          "Logged out — clear auth on the Render disk and pair again"
+          "Logged out from WhatsApp. Pair again once; keep the Render disk so this does not repeat on redeploy."
         );
       }
     });
@@ -203,6 +238,9 @@ function getSock() {
 function getStatus() {
   return connectionStatus;
 }
+function getAuthInfo() {
+  return getAuthStatus(AUTH_DIR);
+}
 async function reconnect() {
   if (connectionStatus === "open" && sock) return;
   await connectToWhatsApp();
@@ -211,6 +249,7 @@ async function reconnect() {
 httpServer = startHttpServer({
   getStatus,
   getSock,
+  getAuthInfo,
   logger,
   isGeminiConfigured,
 });

@@ -12,7 +12,13 @@ import {
  *   GET  /           pairing form + code
  *   POST /pair       { phone: "26377..." } → request pairing code
  */
-export function startHttpServer({ getStatus, getSock, logger, isGeminiConfigured }) {
+export function startHttpServer({
+  getStatus,
+  getSock,
+  getAuthInfo,
+  logger,
+  isGeminiConfigured,
+}) {
   const port = Number(process.env.PORT || 10000);
 
   const server = http.createServer(async (req, res) => {
@@ -27,15 +33,25 @@ export function startHttpServer({ getStatus, getSock, logger, isGeminiConfigured
 
     if (pathName === "/status") {
       const pair = getPairingState();
+      const auth = getAuthInfo?.() || {};
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(
         JSON.stringify({
           status: getStatus(),
           linked: getStatus() === "open",
           geminiConfigured: Boolean(isGeminiConfigured?.()),
+          authDir: auth.authDir || null,
+          onRenderDisk: Boolean(auth.onRenderDisk),
+          renderDiskMounted: Boolean(auth.renderDiskMounted),
+          sessionRegistered: Boolean(auth.sessionRegistered),
+          authFileCount: auth.authFileCount || 0,
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,
+          tip:
+            auth.onRenderDisk
+              ? "Session is on persistent disk — redeploys should not require pairing again."
+              : "WARNING: Attach a Render Disk at /var/data and set BAILEYS_AUTH_DIR=/var/data/auth_info_baileys or you will re-pair every deploy.",
         })
       );
       return;
@@ -82,13 +98,20 @@ export function startHttpServer({ getStatus, getSock, logger, isGeminiConfigured
       const status = getStatus();
       const pair = getPairingState();
 
-      if (status === "open") {
+      const auth = getAuthInfo?.() || {};
+      if (status === "open" || auth.sessionRegistered) {
+        const connected = status === "open";
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(
           page(
-            "Trade Square WhatsApp bot",
-            `<p class="ok">Connected. Message the linked WhatsApp number — the mall bot will reply.</p>
-             <p class="muted">Session is saved on the Render disk. You can close this page.</p>`
+            connected ? "Trade Square WhatsApp bot" : "Session saved — reconnecting",
+            connected
+              ? `<p class="ok">Connected. Message the linked WhatsApp number — the mall bot will reply.</p>
+                 <p class="muted">Session path: <code>${escapeHtml(auth.authDir || "")}</code><br/>
+                 Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO — fix this or redeploys wipe the link"}</strong></p>`
+              : `<p class="ok">WhatsApp session is already saved — no need to pair again.</p>
+                 <p class="muted">Reconnecting… Persistent disk: <strong>${auth.onRenderDisk ? "yes" : "NO"}</strong></p>
+                 <script>setTimeout(()=>location.reload(),4000)</script>`
           )
         );
         return;

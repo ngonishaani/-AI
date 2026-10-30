@@ -57,12 +57,26 @@ Message the linked WhatsApp number. Try:
 
 Replies should feel natural in English, Shona, or a mix.
 
-## 5. Important
+## 5. Stop re-pairing on every redeploy
+
+If you must pair again after each deploy, the WhatsApp session is **not** on a disk.
+
+1. Render → service → **Disks** → **Add Disk**
+   - Mount path: `/var/data`
+   - Size: `1 GB`
+2. **Environment** → set `BAILEYS_AUTH_DIR` = `/var/data/auth_info_baileys`
+3. Redeploy, then pair **one** more time
+4. Open `/status` — need `"onRenderDisk": true` and `"sessionRegistered": true`
+
+After that, redeploys reconnect automatically (no pairing).
+
+## 6. Important
 
 | Do | Don’t |
 |----|--------|
 | Use Starter (or higher) so the service stays up | Use Free web (sleeps → WhatsApp disconnects) |
-| Keep the 1GB disk attached | Delete the disk (forces a new QR scan) |
+| Keep the 1GB disk at `/var/data` | Delete the disk (forces pairing again) |
+| Set `BAILEYS_AUTH_DIR=/var/data/auth_info_baileys` | Leave auth in the repo folder (wiped each deploy) |
 | Set `GEMINI_API_KEY` in Render env | Commit `.env` or `auth_info_baileys` |
 
 ## Manual create (without Blueprint)
