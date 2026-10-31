@@ -8,7 +8,7 @@ import makeWASocket, {
 import { Boom } from "@hapi/boom";
 import pino from "pino";
 import { generateMallReply, isGeminiConfigured } from "./gemini.js";
-import { startCronJobs } from "./cron.js";
+import { getCronDiagnostics, startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
 import {
   clearPairingCode,
@@ -485,6 +485,7 @@ httpServer = startHttpServer({
   forceRelink,
   logger,
   isGeminiConfigured,
+  getCronDiagnostics,
 });
 if (!isGeminiConfigured()) {
   logger.warn(
@@ -499,6 +500,15 @@ stopCron = startCronJobs({
   getStatus,
   reconnect,
   logger,
+});
+logger.info({ cron: getCronDiagnostics() }, "keep-alive cron armed");
+
+// Stay alive on unexpected async errors — log and let cron reconnect.
+process.on("unhandledRejection", (err) => {
+  logger.error({ err: err?.message || err }, "unhandledRejection (bot stays up)");
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err: err?.message || err }, "uncaughtException (bot stays up)");
 });
 
 function shutdown() {

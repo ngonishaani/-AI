@@ -50,15 +50,19 @@ npm start
 3. WhatsApp → Linked Devices → **Link with phone number instead** → enter code
 4. Message that number — marketplace bot replies (`menu`, shop names, products). Auth stays in `auth_info_baileys/` (gitignored).
 
-## Cron jobs
+## Cron / keep-alive
 
-| Schedule | What |
-|----------|------|
-| `*/5 * * * *` | Health check; reconnect if socket is down |
-| `0 * * * *` | Presence poke (`available`) to keep the session warm |
+Uses **Starter** (always-on) on Render so the Node process and WhatsApp socket stay up. Free plan sleeps and will drop Baileys.
+
+| Schedule (default) | What |
+|--------------------|------|
+| `*/3 * * * *` | WhatsApp health check; reconnect if socket is down |
+| `*/10 * * * *` | Presence poke (`available`) to keep the session warm |
+| `*/4 * * * *` | HTTP ping to `/health` (self keep-alive) |
+| every 5 min | Backup `setInterval` health + ping |
 | Optional `BOT_CRON_BROADCAST_*` | Daily text to a JID you configure |
 
-Timezone: `Africa/Harare`.
+Timezone: `Africa/Harare` (`BOT_CRON_TZ`). Check live cron state: `GET /status` or `GET /health?detail=1`.
 
 ## PM2 example
 

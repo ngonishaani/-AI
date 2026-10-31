@@ -28,6 +28,7 @@ export function startHttpServer({
   forceRelink,
   logger,
   isGeminiConfigured,
+  getCronDiagnostics,
 }) {
   const port = Number(process.env.PORT || 10000);
 
@@ -43,6 +44,24 @@ export function startHttpServer({
     }
 
     if (pathName === "/health") {
+      const cron = getCronDiagnostics?.() || null;
+      // Plain "ok" keeps Render health checks happy; ?detail=1 returns JSON.
+      if (url.searchParams.get("detail") === "1") {
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            status: getStatus(),
+            linked: getStatus() === "open",
+            cron,
+            uptimeSec: Math.floor(process.uptime()),
+          })
+        );
+        return;
+      }
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("ok");
       return;
@@ -134,6 +153,7 @@ export function startHttpServer({
       const qr = getLatestQr?.();
       const gemini = getGeminiDiagnostics();
       const catalog = getCatalogMeta();
+      const cron = getCronDiagnostics?.() || null;
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
@@ -156,6 +176,8 @@ export function startHttpServer({
           catalogCount: catalog.count,
           catalogUpdatedAt: catalog.updatedAt,
           liveShopCount: getShops().length,
+          cron,
+          uptimeSec: Math.floor(process.uptime()),
           phone: pair.phone,
           pairingCode: pair.code,
           error: pair.error,
