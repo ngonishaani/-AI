@@ -45,7 +45,7 @@
   ],
   "headers": [
     {
-      "source": "/hero-bg.mp4",
+      "source": "/hero-bg-10s.mp4",
       "headers": [
         { "key": "Content-Type", "value": "video/mp4" },
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }

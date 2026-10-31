@@ -20,7 +20,7 @@
     <link rel="stylesheet" crossorigin href="/assets/index-1c19cfd8.css">
     <link rel="stylesheet" href="/assets/shops.css" />
     <meta name="tsm-catalog-url" content="https://ai-mallbot.onrender.com/catalog" />
-      <link rel="preload" href="/hero-bg.mp4" as="video" type="video/mp4" />
+      <link rel="preload" href="/hero-bg-10s.mp4" as="video" type="video/mp4" />
   </head>
   <body>
     <div id="root"></div>
@@ -100,6 +100,49 @@
 })();
 </script>
 <script src="/assets/site-shops.js" defer></script>
+<script>
+(function () {
+  // Hero clip is trimmed to 10s; keep it looping even if a longer file is cached.
+  var MAX_SEC = 10;
+  function wire(video) {
+    if (!video || video.dataset.heroLoop === "1") return;
+    video.dataset.heroLoop = "1";
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.loop = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("muted", "");
+    video.setAttribute("autoplay", "");
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      video.removeAttribute("autoplay");
+      video.pause();
+      return;
+    }
+    video.addEventListener("timeupdate", function () {
+      if (video.currentTime >= MAX_SEC - 0.05) {
+        video.currentTime = 0.01;
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    });
+    video.addEventListener("ended", function () {
+      video.currentTime = 0.01;
+      var p = video.play();
+      if (p && p.catch) p.catch(function () {});
+    });
+    var play = video.play();
+    if (play && play.catch) play.catch(function () {});
+  }
+  function scan() {
+    document.querySelectorAll("video.hero-video").forEach(wire);
+  }
+  var obs = new MutationObserver(scan);
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
+  else scan();
+})();
+</script>
 
   </body>
 </html>
