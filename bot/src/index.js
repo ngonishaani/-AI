@@ -30,9 +30,11 @@ import {
   parseMenuSelection,
   productCaption,
   shopMenuList,
+  shopImageCaption,
   shopSummary,
   textMainMenu,
   textShopMenu,
+  textShopProducts,
   whatsappLinkText,
 } from "./menus.js";
 import { resolveLocalMediaPath } from "./catalog-store.js";
@@ -187,17 +189,17 @@ async function sendImage(jid, url, caption) {
   }
 }
 
-async function sendListOrText(jid, listPayload, textFallback) {
-  // Always send the numbered text list so shops/products are visible in chat.
-  // Interactive list is optional (many WhatsApp clients hide it behind a button).
-  await sock.sendMessage(jid, { text: textFallback });
+/** Send readable text once; optional short interactive list (no duplicate body). */
+async function sendTextThenList(jid, text, listPayload) {
+  if (text) await sock.sendMessage(jid, { text });
+  if (!listPayload) return false;
   try {
     await sock.sendMessage(jid, listPayload);
     return true;
   } catch (err) {
     logger.warn(
       { err: err?.message || err },
-      "interactive list unsupported — text menu already sent"
+      "interactive list skipped — text already sent"
     );
     return false;
   }
@@ -205,46 +207,52 @@ async function sendListOrText(jid, listPayload, textFallback) {
 
 async function sendMainMenu(jid) {
   clearChatShop(jid);
-  // Numbered shop list first — always readable; optional tap menu after.
-  await sock.sendMessage(jid, { text: textMainMenu() });
-  try {
-    await sock.sendMessage(jid, mainMenuList());
-  } catch (err) {
-    logger.warn(
-      { err: err?.message || err },
-      "interactive shop list skipped"
-    );
-  }
+  await sendTextThenList(jid, textMainMenu(), mainMenuList());
 }
 
-async function sendShopCard(jid, shop) {
+async function sendShopCard(jid, shop, { compact = false } = {}) {
   setChatShop(jid, shop.id);
-  const caption = shopSummary(shop);
-  // Always try the shop photo first when opening a shop
-  const sent = shop.image
-    ? await sendImage(jid, shop.image, caption)
-    : false;
+  if (compact) {
+    // After a Gemini reply — only media + product picker, no second summary
+    const caption = shopImageCaption(shop);
+    if (shop.image) await sendImage(jid, shop.image, caption);
+    await sendTextThenList(jid, textShopProducts(shop), shopMenuList(shop));
+    return;
+  }
+
+  const summary = shopSummary(shop);
+  const sent = shop.image ? await sendImage(jid, shop.image, summary) : false;
   if (!sent) {
-    await sock.sendMessage(jid, { text: caption });
+    await sendTextThenList(jid, textShopMenu(shop), shopMenuList(shop));
+    return;
   }
-  await sendListOrText(jid, shopMenuList(shop), textShopMenu(shop));
+  // Image already has the shop summary — follow with products only
+  await sendTextThenList(jid, textShopProducts(shop), shopMenuList(shop));
 }
 
-async function sendProductCard(jid, shop, product) {
+async function sendProductCard(jid, shop, product, { compact = false } = {}) {
   setChatShop(jid, shop.id);
+  if (compact) {
+    // After Gemini already explained the product — image only, short caption
+    const caption = `*${product.name}*\nat *${shop.name}*`;
+    const sent = await sendImage(
+      jid,
+      product.image || shop.image,
+      caption
+    );
+    if (!sent) {
+      await sock.sendMessage(jid, {
+        text: `💬 ${shop.whatsapp || shop.link || "Ask at the mall"}`,
+      });
+    }
+    return;
+  }
+
   const caption = productCaption(shop, product);
   const sent = await sendImage(jid, product.image || shop.image, caption);
   if (!sent) {
     await sock.sendMessage(jid, { text: caption });
   }
-  await sock.sendMessage(jid, {
-    text: [
-      "*Next*",
-      `• *chat* — WhatsApp ${shop.name}`,
-      "• Reply with a *number* for another product",
-      "• *menu* — all shops",
-    ].join("\n"),
-  });
 }
 
 async function sendWhatsAppLink(jid, shop) {
@@ -254,7 +262,7 @@ async function sendWhatsAppLink(jid, shop) {
   });
 }
 
-async function handleSelection(jid, selection) {
+async function handleSelection(jid, selection, { compact = false } = {}) {
   switch (selection.type) {
     case "menu":
       await sendMainMenu(jid);
@@ -270,7 +278,7 @@ async function handleSelection(jid, selection) {
         });
         return true;
       }
-      await sendShopCard(jid, shop);
+      await sendShopCard(jid, shop, { compact });
       return true;
     }
     case "product": {
@@ -281,7 +289,7 @@ async function handleSelection(jid, selection) {
         });
         return true;
       }
-      await sendProductCard(jid, hit.shop, hit.product);
+      await sendProductCard(jid, hit.shop, hit.product, { compact });
       return true;
     }
     case "whatsapp": {
@@ -302,9 +310,9 @@ async function handleSelection(jid, selection) {
 
 async function applyGeminiAction(jid, action) {
   if (!action?.type || action.type === "none") return;
-  // Small pause so the natural text arrives first
+  // After Gemini already spoke — send cards/media without repeating the same text
   await sleep(350);
-  await handleSelection(jid, action);
+  await handleSelection(jid, action, { compact: true });
 }
 
 function sleep(ms) {
