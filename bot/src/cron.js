@@ -1,22 +1,20 @@
 import cron from "node-cron";
 
 /**
- * Cron jobs that keep the Baileys session alive on Render:
- *   - frequent WhatsApp health + reconnect
- *   - HTTP self-ping so the web process stays warm
- *   - presence poke so the linked device session stays active
- *   - optional daily broadcast
- *
- * Schedules use Africa/Harare (Zimbabwe).
+ * Keep-alive cron — tuned to avoid WhatsApp spam signals.
+ * - HTTP self-ping only (no WhatsApp traffic)
+ * - Occasional reconnect check
+ * - Presence poke OFF by default (enable BOT_PRESENCE_POKE=1)
+ * - Broadcast OFF unless BOT_CRON_BROADCAST_ENABLED=1
  */
 export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
   const jobs = [];
   const healthUrl = resolveHealthUrl();
 
-  // Every 2 minutes: connection health + reconnect if the socket dropped.
+  // Every 5 minutes: connection health + gentle reconnect
   jobs.push(
     cron.schedule(
-      "*/2 * * * *",
+      process.env.BOT_CRON_HEALTH || "*/5 * * * *",
       async () => {
         const status = getStatus();
         logger.info(
@@ -36,11 +34,10 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
     )
   );
 
-  // Every 3 minutes: hit our own /health so hosts that idle inactive
-  // HTTP services (e.g. Render free) keep this process awake.
+  // Every 4 minutes: hit our own /health (does not touch WhatsApp)
   jobs.push(
     cron.schedule(
-      "*/3 * * * *",
+      process.env.BOT_CRON_PING || "*/4 * * * *",
       async () => {
         if (!healthUrl) return;
         try {
@@ -48,18 +45,14 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
             method: "GET",
             headers: { "user-agent": "trade-square-bot-self-keepalive/1.0" },
           });
-          const text = (await res.text()).slice(0, 40);
           if (!res.ok) {
             logger.warn(
-              { status: res.status, text, healthUrl },
+              { status: res.status, healthUrl },
               "cron keep-alive ping failed"
             );
             return;
           }
-          logger.info(
-            { status: res.status, healthUrl },
-            "cron keep-alive ping ok"
-          );
+          logger.debug({ status: res.status, healthUrl }, "cron keep-alive ping ok");
         } catch (err) {
           logger.warn(
             { err: err?.message || err, healthUrl },
@@ -71,27 +64,35 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
     )
   );
 
-  // Every 15 minutes: presence poke so the WhatsApp session stays warm.
-  jobs.push(
-    cron.schedule(
-      "*/15 * * * *",
-      async () => {
-        const sock = getSock();
-        if (!sock || getStatus() !== "open") return;
-        try {
-          await sock.sendPresenceUpdate("available");
-          logger.info("cron presence poke sent");
-        } catch (err) {
-          logger.warn({ err: err?.message || err }, "cron presence poke failed");
-        }
-      },
-      { timezone: "Africa/Harare" }
-    )
-  );
+  // Presence poke is optional — frequent "available" looks automated
+  if (process.env.BOT_PRESENCE_POKE === "1") {
+    jobs.push(
+      cron.schedule(
+        process.env.BOT_CRON_PRESENCE || "0 */2 * * *",
+        async () => {
+          const sock = getSock();
+          if (!sock || getStatus() !== "open") return;
+          try {
+            await sock.sendPresenceUpdate("available");
+            logger.info("cron presence poke sent");
+          } catch (err) {
+            logger.warn(
+              { err: err?.message || err },
+              "cron presence poke failed"
+            );
+          }
+        },
+        { timezone: "Africa/Harare" }
+      )
+    );
+  } else {
+    logger.info("cron presence poke disabled (set BOT_PRESENCE_POKE=1 to enable)");
+  }
 
-  // Optional daily mall hours broadcast to BOT_CRON_BROADCAST_JID (disabled unless set).
+  // Broadcast only when explicitly enabled — cold/bulk texts get accounts flagged
+  const broadcastEnabled = process.env.BOT_CRON_BROADCAST_ENABLED === "1";
   const broadcastJid = process.env.BOT_CRON_BROADCAST_JID?.trim();
-  if (broadcastJid) {
+  if (broadcastEnabled && broadcastJid) {
     const schedule = process.env.BOT_CRON_BROADCAST_SCHEDULE || "0 9 * * *";
     jobs.push(
       cron.schedule(
@@ -101,7 +102,7 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
           if (!sock || getStatus() !== "open") return;
           const text =
             process.env.BOT_CRON_BROADCAST_TEXT ||
-            "Good morning from Trade Square Mall · Kwekwe. Ask me about shops, dining, hours, or leasing space.";
+            "Good morning from Trade Square Marketplace. Reply *menu* for shops.";
           try {
             await sock.sendMessage(broadcastJid, { text });
             logger.info({ broadcastJid }, "cron broadcast sent");
@@ -113,6 +114,10 @@ export function startCronJobs({ getSock, getStatus, reconnect, logger }) {
       )
     );
     logger.info({ schedule, broadcastJid }, "cron broadcast enabled");
+  } else if (broadcastJid && !broadcastEnabled) {
+    logger.warn(
+      "BOT_CRON_BROADCAST_JID set but broadcast disabled — set BOT_CRON_BROADCAST_ENABLED=1 only if you accept ban risk"
+    );
   }
 
   logger.info(
@@ -135,7 +140,6 @@ function resolveHealthUrl() {
     "";
   if (base) return `${base.replace(/\/$/, "")}/health`;
 
-  // Last resort for the known production service
   if (process.env.NODE_ENV === "production" || process.env.RENDER) {
     return "https://ai-mallbot.onrender.com/health";
   }
