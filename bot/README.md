@@ -10,7 +10,7 @@ Baileys (WhatsApp Web multi-device socket)  ← always-on Node process
        │
        ├─ marketplace menus (shops → products → prices / images / store WA)
        ├─ Gemini (open-ended product questions)
-       └─ node-cron (health check every 5 min, hourly presence, optional daily broadcast)
+       └─ node-cron (reconnect every 2 min, /health keep-alive every 3 min, presence every 15 min)
 ```
 
 Trade Square Mall “about” (location, mall hours) is only sent when the customer asks about the place.
@@ -26,14 +26,16 @@ Trade Square Mall “about” (location, mall hours) is only sent when the custo
 Full steps: [docs/render-deploy.md](../docs/render-deploy.md)
 
 1. Push this repo and open [Render Dashboard](https://dashboard.render.com) → **New → Blueprint**
-2. Select repo `-AI` and branch with `render.yaml`
+2. Select repo `-AI` and branch with `render.yaml` (mall site is bundled in `bot/public`)
 3. Set `GEMINI_API_KEY` when prompted (Starter plan — Free sleeps and drops WhatsApp)
-4. After deploy: open `https://<service>.onrender.com/`
-5. Enter your number (country code, digits only) → **Get pairing code**
-6. Phone: **WhatsApp → Linked Devices → Link a device → Link with phone number instead** → enter the code
-7. Message that WhatsApp number — reply *menu* for shops (sample: RoyaleApe) + Gemini replies
+4. After deploy:
+   - Mall site: `https://<service>.onrender.com/` and `/shop`
+   - WhatsApp QR: `https://<service>.onrender.com/qr`
+5. Phone: **WhatsApp → Linked Devices → Link a device** → scan the QR
+6. Message that WhatsApp number — reply *menu* for enrolled shops + Gemini replies
 
 Session files live on the Render disk at `/var/data/auth_info_baileys` so redeploys keep the link.
+When you change site pages at the repo root, run `bot/scripts/sync-site.sh` and commit `bot/public`.
 
 ## Local setup
 
@@ -50,19 +52,15 @@ npm start
 3. WhatsApp → Linked Devices → **Link with phone number instead** → enter code
 4. Message that number — marketplace bot replies (`menu`, shop names, products). Auth stays in `auth_info_baileys/` (gitignored).
 
-## Cron / keep-alive
+## Cron jobs
 
-Uses **Starter** (always-on) on Render so the Node process and WhatsApp socket stay up. Free plan sleeps and will drop Baileys.
-
-| Schedule (default) | What |
-|--------------------|------|
-| `*/3 * * * *` | WhatsApp health check; reconnect if socket is down |
-| `*/10 * * * *` | Presence poke (`available`) to keep the session warm |
-| `*/4 * * * *` | HTTP ping to `/health` (self keep-alive) |
-| every 5 min | Backup `setInterval` health + ping |
+| Schedule | What |
+|----------|------|
+| `*/5 * * * *` | Health check; reconnect if socket is down |
+| `0 * * * *` | Presence poke (`available`) to keep the session warm |
 | Optional `BOT_CRON_BROADCAST_*` | Daily text to a JID you configure |
 
-Timezone: `Africa/Harare` (`BOT_CRON_TZ`). Check live cron state: `GET /status` or `GET /health?detail=1`.
+Timezone: `Africa/Harare`.
 
 ## PM2 example
 
@@ -79,4 +77,6 @@ pm2 save
 - Without `GEMINI_API_KEY`, marketplace menus still work (shops, products, prices, store WhatsApp links).
 - Sample shop catalog: RoyaleApe Studios from [royaleape.com](https://royaleape.com/) (Shop 55).
 - Enrolments from [tradesquaremall.com/enroll](https://www.tradesquaremall.com/enroll/) sync to `PUT /catalog` and merge into the live shop list (`GET /catalog`, `GET /status` → `liveShopCount`).
+- Shop photos (upload or URL) are shown on WhatsApp when a shop is opened. Uploads are stored on the Render disk under `shop-media/` and served from `GET /media/<file>`.
+- **If WhatsApp flags the number:** see [docs/whatsapp-flagged.md](../docs/whatsapp-flagged.md). The bot rate-limits replies, skips interactive lists, and avoids presence/broadcast spam by default.
 - Do not commit `auth_info_baileys/` or `.env`.

@@ -254,14 +254,15 @@ export function parseMenuSelection(text, { currentShopId } = {}) {
     return { type: raw.startsWith("about") ? "about" : "menu" };
   }
 
+  // Explicit shop list only — greetings go to Gemini (avoids dumping menus every hi)
+  if (/^(menu|shops?|list|marketplace|directory)\b/i.test(lower)) {
+    return { type: "menu" };
+  }
   if (
-    /^(menu|hi|hello|hey|start|shops?|list|marketplace|mhoro|masikati|good\s*(morning|afternoon|evening)|howdy|sup)\b/i.test(
+    /^(about|mall info|location|where is the mall|where is trade square)\b/i.test(
       lower
     )
   ) {
-    return { type: "menu" };
-  }
-  if (/^(about|mall|place|location|where is the mall|trade square)\b/i.test(lower)) {
     return { type: "about" };
   }
 

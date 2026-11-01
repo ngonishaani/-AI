@@ -8,7 +8,7 @@ import makeWASocket, {
 import { Boom } from "@hapi/boom";
 import pino from "pino";
 import { generateMallReply, isGeminiConfigured } from "./gemini.js";
-import { getCronDiagnostics, startCronJobs } from "./cron.js";
+import { startCronJobs } from "./cron.js";
 import { startHttpServer } from "./server.js";
 import {
   clearPairingCode,
@@ -26,15 +26,20 @@ import {
   aboutPlaceText,
   getProduct,
   getShop,
-  mainMenuList,
   parseMenuSelection,
   productCaption,
-  shopMenuList,
   shopSummary,
   textMainMenu,
   textShopMenu,
   whatsappLinkText,
 } from "./menus.js";
+import { resolveLocalMediaPath } from "./catalog-store.js";
+import {
+  createTurnBudget,
+  getSendDiagnostics,
+  safeSend,
+} from "./safe-send.js";
+import fs from "node:fs";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -107,14 +112,72 @@ function extractText(msg) {
   ).trim();
 }
 
-async function sendImage(jid, url, caption) {
-  if (!url || !sock) return false;
+function bufferFromDataUrl(dataUrl) {
+  const match = String(dataUrl || "").match(
+    /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/
+  );
+  if (!match) return null;
   try {
-    await sock.sendMessage(jid, {
-      image: { url },
-      caption: caption || undefined,
-    });
-    return true;
+    return Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+  } catch {
+    return null;
+  }
+}
+
+async function replyText(jid, text, budget) {
+  if (!text) return false;
+  if (budget && !budget.take()) {
+    logger.warn({ jid }, "turn budget exhausted — skip extra text");
+    return false;
+  }
+  const res = await safeSend(sock, jid, { text }, { logger });
+  return Boolean(res.ok);
+}
+
+/** Send a shop/product photo. Prefers local media files, then data URLs, then remote URLs. */
+async function sendImage(jid, url, caption, budget) {
+  if (!url || !sock) return false;
+  if (budget && !budget.take()) {
+    logger.warn({ jid }, "turn budget exhausted — skip image");
+    return false;
+  }
+
+  const sendBuf = async (buf) => {
+    const res = await safeSend(
+      sock,
+      jid,
+      { image: buf, caption: caption || undefined },
+      { logger }
+    );
+    return Boolean(res.ok);
+  };
+
+  const localPath = resolveLocalMediaPath(url);
+  if (localPath) {
+    try {
+      return await sendBuf(fs.readFileSync(localPath));
+    } catch (err) {
+      logger.warn(
+        { err: err?.message || err, localPath },
+        "local media send failed — trying other sources"
+      );
+    }
+  }
+
+  if (String(url).startsWith("data:")) {
+    const buf = bufferFromDataUrl(url);
+    if (buf?.length) return sendBuf(buf);
+    return false;
+  }
+
+  try {
+    const res = await safeSend(
+      sock,
+      jid,
+      { image: { url }, caption: caption || undefined },
+      { logger }
+    );
+    if (res.ok) return true;
   } catch (err) {
     logger.warn(
       { err: err?.message || err, url: String(url).slice(0, 80) },
@@ -125,137 +188,110 @@ async function sendImage(jid, url, caption) {
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    await sock.sendMessage(jid, {
-      image: buf,
-      caption: caption || undefined,
-    });
-    return true;
+    return await sendBuf(Buffer.from(await res.arrayBuffer()));
   } catch (err) {
     logger.warn({ err: err?.message || err }, "image send failed");
     return false;
   }
 }
 
-async function sendListOrText(jid, listPayload, textFallback) {
-  // Always send the numbered text list so shops/products are visible in chat.
-  // Interactive list is optional (many WhatsApp clients hide it behind a button).
-  await sock.sendMessage(jid, { text: textFallback });
-  try {
-    await sock.sendMessage(jid, listPayload);
-    return true;
-  } catch (err) {
-    logger.warn(
-      { err: err?.message || err },
-      "interactive list unsupported — text menu already sent"
-    );
-    return false;
-  }
-}
-
-async function sendMainMenu(jid) {
+/**
+ * Anti-flag: one text message only (no interactive list / buttons).
+ * Unofficial list messages are a common ban trigger.
+ */
+async function sendMainMenu(jid, budget) {
   clearChatShop(jid);
-  // Numbered shop list first — always readable; optional tap menu after.
-  await sock.sendMessage(jid, { text: textMainMenu() });
-  try {
-    await sock.sendMessage(jid, mainMenuList());
-  } catch (err) {
-    logger.warn(
-      { err: err?.message || err },
-      "interactive shop list skipped"
+  await replyText(jid, textMainMenu(), budget);
+}
+
+async function sendShopCard(jid, shop, budget) {
+  setChatShop(jid, shop.id);
+  const allowImages = process.env.BOT_SEND_IMAGES !== "0";
+  const summary = shopSummary(shop);
+  if (allowImages && shop.image) {
+    const caption = `${summary}\n\nReply with a product number, *chat*, or *menu*.`;
+    const sent = await sendImage(
+      jid,
+      shop.image,
+      caption.slice(0, 1024),
+      budget
     );
+    if (sent) return;
   }
+  await replyText(jid, textShopMenu(shop), budget);
 }
 
-async function sendShopCard(jid, shop) {
+async function sendProductCard(jid, shop, product, budget) {
   setChatShop(jid, shop.id);
-  const caption = shopSummary(shop);
-  const sent = await sendImage(jid, shop.image, caption);
-  if (!sent) {
-    await sock.sendMessage(jid, { text: caption });
-  }
-  await sendListOrText(jid, shopMenuList(shop), textShopMenu(shop));
-}
-
-async function sendProductCard(jid, shop, product) {
-  setChatShop(jid, shop.id);
+  const allowImages = process.env.BOT_SEND_IMAGES !== "0";
   const caption = productCaption(shop, product);
-  const sent = await sendImage(jid, product.image || shop.image, caption);
-  if (!sent) {
-    await sock.sendMessage(jid, { text: caption });
+  if (allowImages && (product.image || shop.image)) {
+    const sent = await sendImage(
+      jid,
+      product.image || shop.image,
+      caption.slice(0, 1024),
+      budget
+    );
+    if (sent) return;
   }
-  await sock.sendMessage(jid, {
-    text: [
-      "*Next*",
-      `• *chat* — WhatsApp ${shop.name}`,
-      "• Reply with a *number* for another product",
-      "• *menu* — all shops",
-    ].join("\n"),
-  });
+  await replyText(jid, caption, budget);
 }
 
-async function sendWhatsAppLink(jid, shop) {
+async function sendWhatsAppLink(jid, shop, budget) {
   setChatShop(jid, shop.id);
-  await sock.sendMessage(jid, {
-    text: whatsappLinkText(shop),
-  });
+  await replyText(jid, whatsappLinkText(shop), budget);
 }
 
-async function handleSelection(jid, selection) {
+async function handleSelection(jid, selection, budget) {
   switch (selection.type) {
     case "menu":
-      await sendMainMenu(jid);
+      await sendMainMenu(jid, budget);
       return true;
     case "about":
-      await sock.sendMessage(jid, { text: aboutPlaceText() });
+      await replyText(jid, aboutPlaceText(), budget);
       return true;
     case "shop": {
       const shop = getShop(selection.shopId);
       if (!shop) {
-        await sock.sendMessage(jid, {
-          text: "I couldn't find that shop. Reply *menu* to see marketplace shops.",
-        });
+        await replyText(
+          jid,
+          "I couldn't find that shop. Reply *menu* to see marketplace shops.",
+          budget
+        );
         return true;
       }
-      await sendShopCard(jid, shop);
+      await sendShopCard(jid, shop, budget);
       return true;
     }
     case "product": {
       const hit = getProduct(selection.shopId, selection.productId);
       if (!hit) {
-        await sock.sendMessage(jid, {
-          text: "I couldn't find that product. Reply *menu* to browse shops.",
-        });
+        await replyText(
+          jid,
+          "I couldn't find that product. Reply *menu* to browse shops.",
+          budget
+        );
         return true;
       }
-      await sendProductCard(jid, hit.shop, hit.product);
+      await sendProductCard(jid, hit.shop, hit.product, budget);
       return true;
     }
     case "whatsapp": {
       const shop = getShop(selection.shopId);
       if (!shop) {
-        await sock.sendMessage(jid, {
-          text: "Shop WhatsApp not found. Reply *menu* to browse.",
-        });
+        await replyText(
+          jid,
+          "Shop WhatsApp not found. Reply *menu* to browse.",
+          budget
+        );
         return true;
       }
-      await sendWhatsAppLink(jid, shop);
+      await sendWhatsAppLink(jid, shop, budget);
       return true;
     }
     default:
       return false;
   }
-}
-
-async function applyGeminiAction(jid, action) {
-  if (!action?.type || action.type === "none") return;
-  // Small pause so the natural text arrives first
-  await sleep(350);
-  await handleSelection(jid, action);
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function handleIncoming(msg) {
@@ -270,44 +306,48 @@ async function handleIncoming(msg) {
   if (jid.endsWith("@g.us") && process.env.BOT_ALLOW_GROUPS !== "1") {
     return;
   }
+  if (jid.includes("@newsletter") || jid.endsWith("@broadcast")) return;
 
   const text = extractText(msg);
   if (!text) {
-    await sock.sendMessage(jid, {
-      text: "Send me a text — tell me what you're looking for, or say *menu* for shops.",
-    });
+    // Silent on stickers/voice/photos — reduces bot-like chatter that gets flagged
     return;
   }
 
   logger.info({ jid, text: text.slice(0, 120) }, "inbound WhatsApp message");
 
-  try {
-    await sock.sendPresenceUpdate("composing", jid);
-  } catch {
-    /* ignore */
-  }
-
+  const budget = createTurnBudget();
   const state = getChatState(jid);
   const selection = parseMenuSelection(text, {
     currentShopId: state.shopId,
   });
 
-  // Explicit menu shortcuts still work; everything else is natural Gemini chat
   if (selection.type !== "chat") {
-    await handleSelection(jid, selection);
+    await handleSelection(jid, selection, budget);
     logger.info({ jid, selection: selection.type }, "menu shortcut");
     return;
   }
 
   const { text: reply, action } = await generateMallReply(text, { jid });
   if (reply) {
-    await sock.sendMessage(jid, { text: reply });
+    await replyText(jid, reply, budget);
   }
-  if (action) {
+  // Avoid chaining extra menu/product dumps after Gemini (multi-message bursts get flagged)
+  if (
+    action &&
+    budget.remaining() > 0 &&
+    process.env.BOT_GEMINI_ACTIONS !== "0" &&
+    (action.type === "whatsapp" ||
+      action.type === "product" ||
+      action.type === "shop")
+  ) {
     logger.info({ jid, action }, "gemini suggested action");
-    await applyGeminiAction(jid, action);
+    await handleSelection(jid, action, budget);
   }
-  logger.info({ jid, chars: reply?.length || 0 }, "natural gemini reply");
+  logger.info(
+    { jid, chars: reply?.length || 0, send: getSendDiagnostics() },
+    "natural gemini reply"
+  );
 }
 
 async function connectToWhatsApp() {
@@ -335,8 +375,11 @@ async function connectToWhatsApp() {
       logger: pino({ level: "silent" }),
       printQRInTerminal: false,
       syncFullHistory: false,
-      markOnlineOnConnect: true,
+      // Anti-flag: stay quiet on connect unless BOT_MARK_ONLINE=1
+      markOnlineOnConnect: process.env.BOT_MARK_ONLINE === "1",
       generateHighQualityLinkPreview: false,
+      browser: ["Ubuntu", "Chrome", "120.0.0"],
+      getMessage: async () => undefined,
     });
 
     // Persist every creds/keys update to the disk-backed auth folder
@@ -394,26 +437,46 @@ async function connectToWhatsApp() {
             ? err.output?.statusCode
             : new Boom(err)?.output?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
-        logger.warn({ statusCode, loggedOut }, "connection closed");
+        const forbidden = statusCode === DisconnectReason.forbidden;
+        const replaced =
+          statusCode === DisconnectReason.connectionReplaced ||
+          statusCode === DisconnectReason.multideviceMismatch;
+        logger.warn(
+          { statusCode, loggedOut, forbidden, replaced },
+          "connection closed"
+        );
         sock = null;
-        if (!loggedOut) {
-          const delay = Number(process.env.BOT_RECONNECT_MS || 3000);
-          setTimeout(() => {
-            reconnecting = false;
-            connectToWhatsApp().catch((reconnectErr) =>
-              logger.error(
-                { err: reconnectErr?.message || reconnectErr },
-                "reconnect failed"
-              )
-            );
-          }, delay);
+
+        // Banned / forced logout — do NOT tight-loop reconnect (makes flags worse)
+        if (loggedOut || forbidden) {
+          clearPairingCode();
+          clearLatestQr();
+          logger.error(
+            {
+              tip: "Account may be flagged. Wait before /relink. Use a fresh number if banned. Prefer fewer messages.",
+            },
+            "WhatsApp session ended (logged out or forbidden). Open /relink only after cooling off."
+          );
           return;
         }
-        clearPairingCode();
-        clearLatestQr();
-        logger.error(
-          "Logged out from WhatsApp. Open /qr and scan once; keep the Render disk so this does not repeat on redeploy."
-        );
+
+        if (replaced) {
+          logger.error(
+            "Session replaced by another linked device — stop duplicate bots, then /relink once."
+          );
+          return;
+        }
+
+        const delay = Number(process.env.BOT_RECONNECT_MS || 8000);
+        setTimeout(() => {
+          reconnecting = false;
+          connectToWhatsApp().catch((reconnectErr) =>
+            logger.error(
+              { err: reconnectErr?.message || reconnectErr },
+              "reconnect failed"
+            )
+          );
+        }, delay);
       }
     });
 
@@ -430,9 +493,14 @@ async function connectToWhatsApp() {
           try {
             const remote = msg?.key?.remoteJid;
             if (remote && sock) {
-              await sock.sendMessage(remote, {
-                text: "Sorry — something went wrong. Reply *menu* to browse shops.",
-              });
+              await safeSend(
+                sock,
+                remote,
+                {
+                  text: "Sorry — something went wrong. Try again in a moment, or reply *menu*.",
+                },
+                { logger, skipTyping: true }
+              );
             }
           } catch {
             /* ignore */
@@ -485,7 +553,6 @@ httpServer = startHttpServer({
   forceRelink,
   logger,
   isGeminiConfigured,
-  getCronDiagnostics,
 });
 if (!isGeminiConfigured()) {
   logger.warn(
@@ -500,15 +567,6 @@ stopCron = startCronJobs({
   getStatus,
   reconnect,
   logger,
-});
-logger.info({ cron: getCronDiagnostics() }, "keep-alive cron armed");
-
-// Stay alive on unexpected async errors — log and let cron reconnect.
-process.on("unhandledRejection", (err) => {
-  logger.error({ err: err?.message || err }, "unhandledRejection (bot stays up)");
-});
-process.on("uncaughtException", (err) => {
-  logger.error({ err: err?.message || err }, "uncaughtException (bot stays up)");
 });
 
 function shutdown() {
