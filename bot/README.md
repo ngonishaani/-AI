@@ -78,4 +78,5 @@ pm2 save
 - Sample shop catalog: RoyaleApe Studios from [royaleape.com](https://royaleape.com/) (Shop 55).
 - Enrolments from [tradesquaremall.com/enroll](https://www.tradesquaremall.com/enroll/) sync to `PUT /catalog` and merge into the live shop list (`GET /catalog`, `GET /status` → `liveShopCount`).
 - Shop photos (upload or URL) are shown on WhatsApp when a shop is opened. Uploads are stored on the Render disk under `shop-media/` and served from `GET /media/<file>`.
+- **If WhatsApp flags the number:** see [docs/whatsapp-flagged.md](../docs/whatsapp-flagged.md). The bot rate-limits replies, skips interactive lists, and avoids presence/broadcast spam by default.
 - Do not commit `auth_info_baileys/` or `.env`.
