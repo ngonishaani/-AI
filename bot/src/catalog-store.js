@@ -101,6 +101,82 @@ export function slugify(value) {
   );
 }
 
+const MAX_STORED_IMAGE_BYTES = 2 * 1024 * 1024;
+
+/** Directory for persisted shop/product upload bytes (survives redeploys on Render disk). */
+export function mediaDir() {
+  return path.join(path.dirname(catalogPath()), "shop-media");
+}
+
+export function publicBaseUrl() {
+  const raw =
+    process.env.BOT_PUBLIC_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    "https://ai-mallbot.onrender.com";
+  return raw.replace(/\/$/, "");
+}
+
+export function resolvePublicImageUrl(image) {
+  const value = String(image || "").trim();
+  if (!value) return "";
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("/media/")) return `${publicBaseUrl()}${value}`;
+  return value;
+}
+
+/** Resolve catalog image to a local shop-media file path when applicable. */
+export function resolveLocalMediaPath(image) {
+  const value = String(image || "").trim();
+  if (!value) return null;
+  let filename = "";
+  if (value.startsWith("/media/")) {
+    filename = value.slice("/media/".length);
+  } else {
+    try {
+      const u = new URL(value);
+      if (u.pathname.startsWith("/media/")) {
+        filename = u.pathname.slice("/media/".length);
+      }
+    } catch {
+      return null;
+    }
+  }
+  filename = path.basename(filename);
+  if (!filename || filename.includes("..")) return null;
+  if (!/\.(jpe?g|png|webp|gif)$/i.test(filename)) return null;
+  const full = path.join(mediaDir(), filename);
+  return fs.existsSync(full) ? full : null;
+}
+
+function extForMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("gif")) return "gif";
+  return "jpg";
+}
+
+export function materializeDataUrl(dataUrl, key) {
+  const raw = String(dataUrl || "");
+  const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return "";
+  let buf;
+  try {
+    buf = Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+  } catch {
+    return "";
+  }
+  if (!buf.length || buf.length > MAX_STORED_IMAGE_BYTES) return "";
+  const ext = extForMime(match[1]);
+  const base = slugify(key) || `img-${Date.now().toString(36)}`;
+  const filename = `${base}.${ext}`;
+  const dir = mediaDir();
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, filename), buf);
+  return `/media/${filename}`;
+}
+
+
 function parsePrice(value) {
   if (value == null || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
