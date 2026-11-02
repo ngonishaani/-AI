@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "tsm-enrolled-shops";
-  const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+  /** Accept larger camera photos — we compress before syncing to the bot. */
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const CATALOG_URL =
     document.querySelector('meta[name="tsm-catalog-url"]')?.content?.trim() ||
     "https://ai-mallbot.onrender.com/catalog";
@@ -36,27 +37,12 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(shops));
   }
 
-  /** Bot sync cannot carry multi‑MB data-URL uploads (CDN body limits). */
+  /**
+   * Send shops as-is (including compressed data-URL photos). The bot persists
+   * uploads under /media/ and returns absolute image URLs for WhatsApp.
+   */
   function shopsForBotSync(shops) {
-    let omittedImages = 0;
-    const cleaned = (Array.isArray(shops) ? shops : []).map((shop) => {
-      const next = { ...shop };
-      if (typeof next.image === "string" && next.image.startsWith("data:")) {
-        next.image = "";
-        omittedImages += 1;
-      }
-      if (Array.isArray(next.products)) {
-        next.products = next.products.map((product) => {
-          if (product && typeof product.image === "string" && product.image.startsWith("data:")) {
-            omittedImages += 1;
-            return { ...product, image: "" };
-          }
-          return product;
-        });
-      }
-      return next;
-    });
-    return { shops: cleaned, omittedImages };
+    return { shops: Array.isArray(shops) ? shops : [] };
   }
 
   async function syncCatalogToBot(shops) {
@@ -84,13 +70,47 @@
         if (!res.ok) {
           throw new Error(data?.error || `Bot sync failed (${res.status})`);
         }
+        // Prefer bot-returned shops (data URLs rewritten to /media/ URLs),
+        // but keep local photos when the bot omitted an upload.
+        if (Array.isArray(data?.shops) && data.shops.length) {
+          saveShops(mergeRemoteShops(data.shops, prepared.shops));
+          renderEnrolled();
+        }
         return {
           ok: true,
           data,
-          omittedImages: prepared.omittedImages + (data?.omittedImages || 0),
+          omittedImages: data?.omittedImages || 0,
+          shopsWithImages: data?.shopsWithImages || 0,
         };
       })
       .catch((err) => ({ ok: false, error: err?.message || String(err) }));
+  }
+
+  function hasUsableImage(image) {
+    const value = String(image || "").trim();
+    if (!value) return false;
+    if (value.startsWith("data:image/")) return true;
+    if (value.startsWith("/media/")) return true;
+    return /^https?:\/\//i.test(value);
+  }
+
+  /** Keep a local enrolled photo when the bot response has an empty/omitted image. */
+  function mergeRemoteShops(remote, local) {
+    const localById = new Map(
+      (Array.isArray(local) ? local : [])
+        .filter((s) => s && s.id)
+        .map((s) => [String(s.id), s])
+    );
+    return (Array.isArray(remote) ? remote : []).map((shop) => {
+      if (!shop || typeof shop !== "object") return shop;
+      const prev = localById.get(String(shop.id || ""));
+      if (hasUsableImage(shop.image) || !prev || !hasUsableImage(prev.image)) {
+        return shop;
+      }
+      const next = { ...shop, image: prev.image };
+      delete next.imageOmitted;
+      return next;
+    });
   }
 
   async function hydrateFromBot() {
@@ -100,10 +120,12 @@
       if (!res.ok) return;
       const data = await res.json();
       const remote = Array.isArray(data?.shops) ? data.shops : [];
-      if (!remote.length && !loadShops().length) return;
-      // Prefer the bot catalog as source of truth when it has shops
+      const local = loadShops();
+      if (!remote.length && !local.length) return;
+      // Prefer the bot catalog as source of truth when it has shops,
+      // but do not wipe enrolled photos the bot failed to store.
       if (remote.length) {
-        saveShops(remote);
+        saveShops(mergeRemoteShops(remote, local));
         renderEnrolled();
         setStatus(
           `Loaded ${remote.length} enrolled shop${remote.length === 1 ? "" : "s"} from WhatsApp bot.`
@@ -121,13 +143,18 @@
     const result = await syncCatalogToBot(shops);
     if (result.ok) {
       const live = result.data?.liveCount;
+      const withImages = result.shopsWithImages;
       const omitted = result.omittedImages
-        ? " Uploaded photos stay on this device — use an image URL for WhatsApp."
+        ? ` ${result.omittedImages} photo${result.omittedImages === 1 ? "" : "s"} could not be stored (too large).`
         : "";
+      const photos =
+        withImages != null
+          ? ` ${withImages} shop photo${withImages === 1 ? "" : "s"} ready for WhatsApp.`
+          : "";
       setStatus(
         live != null
-          ? `${successMessage} Updated on WhatsApp bot (${live} shop${live === 1 ? "" : "s"} live).${omitted}`
-          : `${successMessage} Updated on WhatsApp bot.${omitted}`
+          ? `${successMessage} Updated on WhatsApp bot (${live} shop${live === 1 ? "" : "s"} live).${photos}${omitted}`
+          : `${successMessage} Updated on WhatsApp bot.${photos}${omitted}`
       );
     } else if (!result.skipped) {
       setStatus(
@@ -137,6 +164,56 @@
     } else {
       setStatus(successMessage);
     }
+  }
+
+  /** Resize/compress uploads so catalog sync stays under body limits. */
+  function compressImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read that image."));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Could not decode that image."));
+        img.onload = () => {
+          let maxEdge = 1280;
+          let quality = 0.8;
+          let dataUrl = "";
+
+          const paint = () => {
+            let { width, height } = img;
+            const scale = Math.min(1, maxEdge / Math.max(width, height));
+            width = Math.max(1, Math.round(width * scale));
+            height = Math.max(1, Math.round(height * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(String(reader.result || ""));
+              return false;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            dataUrl = canvas.toDataURL("image/jpeg", quality);
+            return true;
+          };
+
+          if (!paint()) return;
+          while (dataUrl.length > 700_000 && quality > 0.35) {
+            quality -= 0.1;
+            if (!paint()) return;
+          }
+          // Still large — shrink the longest edge and try again.
+          while (dataUrl.length > 700_000 && maxEdge > 640) {
+            maxEdge = Math.round(maxEdge * 0.75);
+            quality = Math.max(0.35, quality - 0.05);
+            if (!paint()) return;
+          }
+          resolve(dataUrl);
+        };
+        img.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   function slugify(value) {
@@ -263,7 +340,9 @@
     form.imageFile.value = "";
     imageHint.textContent = uploadedImageDataUrl
       ? "Using uploaded photo from this enrolment"
-      : "Or upload a photo (max 1.5 MB)";
+      : hasUsableImage(shop.image)
+        ? "Using enrolled photo — upload a new file to replace it"
+        : "Or upload a shop photo (compressed before sync)";
     showImagePreview(shop.image || "");
     productList.innerHTML = "";
     const products = shop.products && shop.products.length ? shop.products : [{}];
@@ -279,7 +358,7 @@
     productList.innerHTML = "";
     addProduct();
     showImagePreview("");
-    imageHint.textContent = "Or upload a photo (max 1.5 MB)";
+    imageHint.textContent = "Or upload a shop photo (compressed before sync)";
     setStatus("");
   }
 
@@ -304,13 +383,16 @@
     }
 
     const shops = loadShops();
+    const previous = editingId ? shops.find((shop) => shop.id === editingId) : null;
+    // Keep the existing enrolled photo when editing without a new upload.
+    const resolvedImage = image || (previous && hasUsableImage(previous.image) ? previous.image : "");
     const id = editingId || `${slugify(name)}-${Date.now().toString(36)}`;
     const payload = {
       id,
       name,
       floor,
       number,
-      image,
+      image: resolvedImage,
       description,
       link,
       products: products.map((product, index) => ({
@@ -342,14 +424,14 @@
   form.image.addEventListener("input", () => {
     if (form.image.value.trim()) {
       uploadedImageDataUrl = "";
-      imageHint.textContent = "Or upload a photo (max 1.5 MB)";
+      imageHint.textContent = "Or upload a shop photo (compressed before sync)";
       showImagePreview(form.image.value.trim());
     } else if (!uploadedImageDataUrl) {
       showImagePreview("");
     }
   });
 
-  form.imageFile.addEventListener("change", () => {
+  form.imageFile.addEventListener("change", async () => {
     const file = form.imageFile.files && form.imageFile.files[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -358,20 +440,21 @@
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setStatus("Image is too large. Keep uploads under 1.5 MB.", true);
+      setStatus("Image is too large. Keep uploads under 8 MB.", true);
       form.imageFile.value = "";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadedImageDataUrl = String(reader.result || "");
+    setStatus("Compressing shop photo…");
+    try {
+      uploadedImageDataUrl = await compressImageFile(file);
       form.image.value = "";
       imageHint.textContent = `Selected: ${file.name}`;
       showImagePreview(uploadedImageDataUrl);
-      setStatus("");
-    };
-    reader.onerror = () => setStatus("Could not read that image.", true);
-    reader.readAsDataURL(file);
+      setStatus("Shop photo ready — it will appear on WhatsApp when this shop is opened.");
+    } catch (err) {
+      setStatus(err?.message || "Could not read that image.", true);
+      form.imageFile.value = "";
+    }
   });
 
   enrolledList.addEventListener("click", (event) => {
@@ -420,13 +503,18 @@
     const result = await syncCatalogToBot(shops);
     if (result.ok) {
       const live = result.data?.liveCount;
+      const withImages = result.shopsWithImages;
+      const photos =
+        withImages != null
+          ? ` · ${withImages} shop photo${withImages === 1 ? "" : "s"} for WhatsApp`
+          : "";
       const omitted = result.omittedImages
-        ? " Uploaded photos stay on this device — use an image URL for WhatsApp."
+        ? ` · ${result.omittedImages} photo${result.omittedImages === 1 ? "" : "s"} skipped (too large)`
         : "";
       setStatus(
         live != null
-          ? `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} · ${live} live on bot.${omitted}`
-          : `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} to the bot.${omitted}`
+          ? `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} · ${live} live on bot${photos}${omitted}.`
+          : `Synced ${shops.length} enrolled shop${shops.length === 1 ? "" : "s"} to the bot${photos}${omitted}.`
       );
     } else {
       setStatus(`Bot sync failed: ${result.error}`, true);

@@ -1,6 +1,8 @@
 /**
  * Persistent enrolled-shop catalog (from tradesquaremall.com/enroll).
  * Stored on disk next to Baileys auth so Render redeploys keep enrolments.
+ * Uploaded shop photos (data URLs) are written under shop-media/ and rewritten
+ * to /media/<file> so the website and WhatsApp can show enrolled photos.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +11,8 @@ import { resolveAuthDir } from "./auth-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_FALLBACK = path.join(__dirname, "..", "data", "enrolled-shops.json");
+/** Allow phone uploads after client compression; website needs the enrolled photo. */
+const MAX_STORED_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function catalogPath() {
   if (process.env.CATALOG_PATH?.trim()) {
@@ -30,66 +34,6 @@ function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-/** Drop huge base64 uploads — they break Cloudflare/Render body limits and WhatsApp menus. */
-export function sanitizeShopsForStorage(shops) {
-  return (Array.isArray(shops) ? shops : []).map((shop) => {
-    if (!shop || typeof shop !== "object") return shop;
-    const next = { ...shop };
-    if (typeof next.image === "string" && next.image.startsWith("data:")) {
-      next.image = "";
-      next.imageOmitted = true;
-    }
-    if (Array.isArray(next.products)) {
-      next.products = next.products.map((product) => {
-        if (!product || typeof product !== "object") return product;
-        if (typeof product.image === "string" && product.image.startsWith("data:")) {
-          return { ...product, image: "", imageOmitted: true };
-        }
-        return product;
-      });
-    }
-    return next;
-  });
-}
-
-export function loadEnrolledRaw() {
-  const filePath = catalogPath();
-  try {
-    if (!fs.existsSync(filePath)) {
-      return { shops: [], updatedAt: null };
-    }
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    const shops = Array.isArray(parsed?.shops) ? parsed.shops : Array.isArray(parsed) ? parsed : [];
-    return {
-      shops,
-      updatedAt: parsed?.updatedAt || null,
-    };
-  } catch {
-    return { shops: [], updatedAt: null };
-  }
-}
-
-export function saveEnrolledRaw(shops) {
-  const list = sanitizeShopsForStorage(shops);
-  const filePath = catalogPath();
-  ensureDir(filePath);
-  const payload = {
-    shops: list,
-    updatedAt: new Date().toISOString(),
-  };
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
-  return payload;
-}
-
-export function getCatalogMeta() {
-  const data = loadEnrolledRaw();
-  return {
-    path: catalogPath(),
-    count: data.shops.length,
-    updatedAt: data.updatedAt,
-  };
-}
-
 export function slugify(value) {
   return (
     String(value || "")
@@ -100,8 +44,6 @@ export function slugify(value) {
       .slice(0, 48) || "shop"
   );
 }
-
-const MAX_STORED_IMAGE_BYTES = 2 * 1024 * 1024;
 
 /** Directory for persisted shop/product upload bytes (survives redeploys on Render disk). */
 export function mediaDir() {
@@ -156,9 +98,16 @@ function extForMime(mime) {
   return "jpg";
 }
 
+/**
+ * Persist a data-URL upload to shop-media/ and return a portable /media/… path.
+ * Oversized or invalid payloads return "".
+ */
 export function materializeDataUrl(dataUrl, key) {
-  const raw = String(dataUrl || "");
-  const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  const raw = String(dataUrl || "").trim();
+  // Allow optional parameters (charset, name, …) before ;base64,
+  const match = raw.match(
+    /^data:(image\/[a-zA-Z0-9.+-]+)(?:;[a-zA-Z0-9_.=+-]+)*;base64,([A-Za-z0-9+/=\s]+)$/i
+  );
   if (!match) return "";
   let buf;
   try {
@@ -174,6 +123,138 @@ export function materializeDataUrl(dataUrl, key) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, filename), buf);
   return `/media/${filename}`;
+}
+
+function isUsableStoredImage(image) {
+  const value = String(image || "").trim();
+  if (!value || value.startsWith("data:")) return false;
+  return value.startsWith("/media/") || /^https?:\/\//i.test(value);
+}
+
+function portableMediaPath(image) {
+  const value = String(image || "").trim();
+  if (!value) return "";
+  try {
+    const u = new URL(value);
+    if (u.pathname.startsWith("/media/")) return u.pathname;
+  } catch {
+    // not absolute
+  }
+  return value;
+}
+
+function persistImageField(image, key, previousImage = "") {
+  const value = String(image || "").trim();
+  if (!value) {
+    if (isUsableStoredImage(previousImage)) {
+      return { image: portableMediaPath(previousImage), omitted: false };
+    }
+    return { image: "", omitted: false };
+  }
+  if (value.startsWith("data:")) {
+    const stored = materializeDataUrl(value, key);
+    if (stored) return { image: stored, omitted: false };
+    if (isUsableStoredImage(previousImage)) {
+      return { image: portableMediaPath(previousImage), omitted: false };
+    }
+    return { image: "", omitted: true };
+  }
+  try {
+    const u = new URL(value);
+    if (u.pathname.startsWith("/media/")) {
+      return { image: u.pathname, omitted: false };
+    }
+  } catch {
+    // not absolute
+  }
+  if (value.startsWith("/media/") || /^https?:\/\//i.test(value)) {
+    return { image: value, omitted: false };
+  }
+  return { image: value, omitted: false };
+}
+
+/**
+ * Persist data-URL uploads to disk; keep http(s) and /media paths.
+ * Previously this wrongly wiped every data: image — that is why website photos never changed.
+ */
+export function sanitizeShopsForStorage(shops, previousShops = []) {
+  const prevById = new Map(
+    (Array.isArray(previousShops) ? previousShops : [])
+      .filter((s) => s && typeof s === "object" && s.id)
+      .map((s) => [String(s.id), s])
+  );
+
+  return (Array.isArray(shops) ? shops : []).map((shop) => {
+    if (!shop || typeof shop !== "object") return shop;
+    const next = { ...shop };
+    const shopKey = slugify(next.id || next.name) || "shop";
+    const prev = prevById.get(String(next.id || "")) || null;
+    const shopImg = persistImageField(next.image, shopKey, prev?.image || "");
+    next.image = shopImg.image;
+    if (shopImg.omitted) next.imageOmitted = true;
+    else delete next.imageOmitted;
+
+    const prevProducts = Array.isArray(prev?.products) ? prev.products : [];
+    if (Array.isArray(next.products)) {
+      next.products = next.products.map((product, index) => {
+        if (!product || typeof product !== "object") return product;
+        const productKey = `${shopKey}-${slugify(product.id || product.name) || `p${index + 1}`}`;
+        const prevProduct =
+          prevProducts.find((p) => p && p.id && p.id === product.id) ||
+          prevProducts[index] ||
+          null;
+        const productImg = persistImageField(
+          product.image,
+          productKey,
+          prevProduct?.image || ""
+        );
+        const out = { ...product, image: productImg.image };
+        if (productImg.omitted) out.imageOmitted = true;
+        else delete out.imageOmitted;
+        return out;
+      });
+    }
+    return next;
+  });
+}
+
+export function loadEnrolledRaw() {
+  const filePath = catalogPath();
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { shops: [], updatedAt: null };
+    }
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const shops = Array.isArray(parsed?.shops) ? parsed.shops : Array.isArray(parsed) ? parsed : [];
+    return {
+      shops,
+      updatedAt: parsed?.updatedAt || null,
+    };
+  } catch {
+    return { shops: [], updatedAt: null };
+  }
+}
+
+export function saveEnrolledRaw(shops) {
+  const previous = loadEnrolledRaw().shops;
+  const list = sanitizeShopsForStorage(shops, previous);
+  const filePath = catalogPath();
+  ensureDir(filePath);
+  const payload = {
+    shops: list,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  return payload;
+}
+
+export function getCatalogMeta() {
+  const data = loadEnrolledRaw();
+  return {
+    path: catalogPath(),
+    count: data.shops.length,
+    updatedAt: data.updatedAt,
+  };
 }
 
 
@@ -229,7 +310,7 @@ export function normalizeEnrolledShop(raw) {
           id: productId,
           name: productName,
           description: String(p.description || productName).trim(),
-          image: String(p.image || raw.image || "").trim(),
+          image: resolvePublicImageUrl(p.image || raw.image || ""),
           link: String(p.link || raw.link || "").trim(),
           includes: Array.isArray(p.includes) ? p.includes : [],
           variations: p.variations.map((v, vi) => ({
@@ -246,7 +327,7 @@ export function normalizeEnrolledShop(raw) {
         id: productId,
         name: productName,
         description: String(p.description || productName).trim(),
-        image: String(p.image || raw.image || "").trim(),
+        image: resolvePublicImageUrl(p.image || raw.image || ""),
         link: String(p.link || raw.link || "").trim(),
         includes: [],
         variations: [
@@ -267,7 +348,7 @@ export function normalizeEnrolledShop(raw) {
       id: "general",
       name: "Ask the shop",
       description: "Message the shop for products and prices.",
-      image: String(raw.image || "").trim(),
+      image: resolvePublicImageUrl(raw.image || ""),
       link: String(raw.link || "").trim(),
       includes: [],
       variations: [
@@ -287,7 +368,7 @@ export function normalizeEnrolledShop(raw) {
     name,
     floor: String(raw.floor || "Trade Square Mall").trim(),
     number: String(raw.number || "").trim() || "—",
-    image: String(raw.image || "").trim(),
+    image: resolvePublicImageUrl(raw.image || ""),
     description: String(raw.description || "").trim() || `${name} at Trade Square Mall.`,
     link: String(raw.link || "").trim() || "https://tradesquaremall.com",
     whatsapp: whatsapp || String(raw.link || "").trim(),
