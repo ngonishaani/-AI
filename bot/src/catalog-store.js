@@ -11,7 +11,8 @@ import { resolveAuthDir } from "./auth-path.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_FALLBACK = path.join(__dirname, "..", "data", "enrolled-shops.json");
-const MAX_STORED_IMAGE_BYTES = 2 * 1024 * 1024;
+/** Allow phone uploads after client compression; website needs the enrolled photo. */
+const MAX_STORED_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function catalogPath() {
   if (process.env.CATALOG_PATH?.trim()) {
@@ -97,8 +98,11 @@ function extForMime(mime) {
  * Oversized or invalid payloads return "".
  */
 export function materializeDataUrl(dataUrl, key) {
-  const raw = String(dataUrl || "");
-  const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  const raw = String(dataUrl || "").trim();
+  // Allow optional parameters (charset, name, …) before ;base64,
+  const match = raw.match(
+    /^data:(image\/[a-zA-Z0-9.+-]+)(?:;[a-zA-Z0-9_.=+-]+)*;base64,([A-Za-z0-9+/=\s]+)$/i
+  );
   if (!match) return "";
   let buf;
   try {
@@ -117,13 +121,56 @@ export function materializeDataUrl(dataUrl, key) {
   return `/media/${filename}`;
 }
 
-function persistImageField(image, key) {
+function isUsableStoredImage(image) {
   const value = String(image || "").trim();
-  if (!value) return { image: "", omitted: false };
+  if (!value || value.startsWith("data:")) return false;
+  return value.startsWith("/media/") || /^https?:\/\//i.test(value);
+}
+
+function persistImageField(image, key, previousImage = "") {
+  const value = String(image || "").trim();
+  if (!value) {
+    // Keep a previously persisted enrolled photo instead of wiping it.
+    if (isUsableStoredImage(previousImage)) {
+      const prev = String(previousImage).trim();
+      // Prefer portable /media path when the previous value was absolutized
+      try {
+        const u = new URL(prev);
+        if (u.pathname.startsWith("/media/")) {
+          return { image: u.pathname, omitted: false };
+        }
+      } catch {
+        // not an absolute URL
+      }
+      return { image: prev, omitted: false };
+    }
+    return { image: "", omitted: false };
+  }
   if (value.startsWith("data:")) {
     const stored = materializeDataUrl(value, key);
     if (stored) return { image: stored, omitted: false };
+    if (isUsableStoredImage(previousImage)) {
+      const prev = String(previousImage).trim();
+      try {
+        const u = new URL(prev);
+        if (u.pathname.startsWith("/media/")) {
+          return { image: u.pathname, omitted: false };
+        }
+      } catch {
+        // keep prev as-is
+      }
+      return { image: prev, omitted: false };
+    }
     return { image: "", omitted: true };
+  }
+  // Absolute media URL from the enrol page → store portable path
+  try {
+    const u = new URL(value);
+    if (u.pathname.startsWith("/media/")) {
+      return { image: u.pathname, omitted: false };
+    }
+  } catch {
+    // not absolute
   }
   // Already a media path or remote URL — keep as-is
   if (value.startsWith("/media/") || /^https?:\/\//i.test(value)) {
@@ -133,21 +180,37 @@ function persistImageField(image, key) {
 }
 
 /** Persist data-URL uploads to disk; keep http(s) and /media paths. */
-export function sanitizeShopsForStorage(shops) {
+export function sanitizeShopsForStorage(shops, previousShops = []) {
+  const prevById = new Map(
+    (Array.isArray(previousShops) ? previousShops : [])
+      .filter((s) => s && typeof s === "object" && s.id)
+      .map((s) => [String(s.id), s])
+  );
+
   return (Array.isArray(shops) ? shops : []).map((shop) => {
     if (!shop || typeof shop !== "object") return shop;
     const next = { ...shop };
     const shopKey = slugify(next.id || next.name) || "shop";
-    const shopImg = persistImageField(next.image, shopKey);
+    const prev = prevById.get(String(next.id || "")) || null;
+    const shopImg = persistImageField(next.image, shopKey, prev?.image || "");
     next.image = shopImg.image;
     if (shopImg.omitted) next.imageOmitted = true;
     else delete next.imageOmitted;
 
+    const prevProducts = Array.isArray(prev?.products) ? prev.products : [];
     if (Array.isArray(next.products)) {
       next.products = next.products.map((product, index) => {
         if (!product || typeof product !== "object") return product;
         const productKey = `${shopKey}-${slugify(product.id || product.name) || `p${index + 1}`}`;
-        const productImg = persistImageField(product.image, productKey);
+        const prevProduct =
+          prevProducts.find((p) => p && p.id && p.id === product.id) ||
+          prevProducts[index] ||
+          null;
+        const productImg = persistImageField(
+          product.image,
+          productKey,
+          prevProduct?.image || ""
+        );
         const out = { ...product, image: productImg.image };
         if (productImg.omitted) out.imageOmitted = true;
         else delete out.imageOmitted;
@@ -176,7 +239,8 @@ export function loadEnrolledRaw() {
 }
 
 export function saveEnrolledRaw(shops) {
-  const list = sanitizeShopsForStorage(shops);
+  const previous = loadEnrolledRaw().shops;
+  const list = sanitizeShopsForStorage(shops, previous);
   const filePath = catalogPath();
   ensureDir(filePath);
   const payload = {
