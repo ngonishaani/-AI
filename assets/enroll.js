@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "tsm-enrolled-shops";
-  const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+  /** Accept larger camera photos — we compress before syncing to the bot. */
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const CATALOG_URL =
     document.querySelector('meta[name="tsm-catalog-url"]')?.content?.trim() ||
     "https://ai-mallbot.onrender.com/catalog";
@@ -69,9 +70,10 @@
         if (!res.ok) {
           throw new Error(data?.error || `Bot sync failed (${res.status})`);
         }
-        // Prefer bot-returned shops (data URLs rewritten to /media/ URLs)
+        // Prefer bot-returned shops (data URLs rewritten to /media/ URLs),
+        // but keep local photos when the bot omitted an upload.
         if (Array.isArray(data?.shops) && data.shops.length) {
-          saveShops(data.shops);
+          saveShops(mergeRemoteShops(data.shops, prepared.shops));
           renderEnrolled();
         }
         return {
@@ -84,6 +86,33 @@
       .catch((err) => ({ ok: false, error: err?.message || String(err) }));
   }
 
+  function hasUsableImage(image) {
+    const value = String(image || "").trim();
+    if (!value) return false;
+    if (value.startsWith("data:image/")) return true;
+    if (value.startsWith("/media/")) return true;
+    return /^https?:\/\//i.test(value);
+  }
+
+  /** Keep a local enrolled photo when the bot response has an empty/omitted image. */
+  function mergeRemoteShops(remote, local) {
+    const localById = new Map(
+      (Array.isArray(local) ? local : [])
+        .filter((s) => s && s.id)
+        .map((s) => [String(s.id), s])
+    );
+    return (Array.isArray(remote) ? remote : []).map((shop) => {
+      if (!shop || typeof shop !== "object") return shop;
+      const prev = localById.get(String(shop.id || ""));
+      if (hasUsableImage(shop.image) || !prev || !hasUsableImage(prev.image)) {
+        return shop;
+      }
+      const next = { ...shop, image: prev.image };
+      delete next.imageOmitted;
+      return next;
+    });
+  }
+
   async function hydrateFromBot() {
     if (!CATALOG_URL) return;
     try {
@@ -91,10 +120,12 @@
       if (!res.ok) return;
       const data = await res.json();
       const remote = Array.isArray(data?.shops) ? data.shops : [];
-      if (!remote.length && !loadShops().length) return;
-      // Prefer the bot catalog as source of truth when it has shops
+      const local = loadShops();
+      if (!remote.length && !local.length) return;
+      // Prefer the bot catalog as source of truth when it has shops,
+      // but do not wipe enrolled photos the bot failed to store.
       if (remote.length) {
-        saveShops(remote);
+        saveShops(mergeRemoteShops(remote, local));
         renderEnrolled();
         setStatus(
           `Loaded ${remote.length} enrolled shop${remote.length === 1 ? "" : "s"} from WhatsApp bot.`
@@ -144,25 +175,38 @@
         const img = new Image();
         img.onerror = () => reject(new Error("Could not decode that image."));
         img.onload = () => {
-          const maxEdge = 1280;
-          let { width, height } = img;
-          const scale = Math.min(1, maxEdge / Math.max(width, height));
-          width = Math.max(1, Math.round(width * scale));
-          height = Math.max(1, Math.round(height * scale));
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            resolve(String(reader.result || ""));
-            return;
-          }
-          ctx.drawImage(img, 0, 0, width, height);
-          let quality = 0.82;
-          let dataUrl = canvas.toDataURL("image/jpeg", quality);
-          while (dataUrl.length > 900_000 && quality > 0.45) {
-            quality -= 0.1;
+          let maxEdge = 1280;
+          let quality = 0.8;
+          let dataUrl = "";
+
+          const paint = () => {
+            let { width, height } = img;
+            const scale = Math.min(1, maxEdge / Math.max(width, height));
+            width = Math.max(1, Math.round(width * scale));
+            height = Math.max(1, Math.round(height * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(String(reader.result || ""));
+              return false;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
             dataUrl = canvas.toDataURL("image/jpeg", quality);
+            return true;
+          };
+
+          if (!paint()) return;
+          while (dataUrl.length > 700_000 && quality > 0.35) {
+            quality -= 0.1;
+            if (!paint()) return;
+          }
+          // Still large — shrink the longest edge and try again.
+          while (dataUrl.length > 700_000 && maxEdge > 640) {
+            maxEdge = Math.round(maxEdge * 0.75);
+            quality = Math.max(0.35, quality - 0.05);
+            if (!paint()) return;
           }
           resolve(dataUrl);
         };
@@ -296,7 +340,9 @@
     form.imageFile.value = "";
     imageHint.textContent = uploadedImageDataUrl
       ? "Using uploaded photo from this enrolment"
-      : "Or upload a photo (max 1.5 MB)";
+      : hasUsableImage(shop.image)
+        ? "Using enrolled photo — upload a new file to replace it"
+        : "Or upload a shop photo (compressed before sync)";
     showImagePreview(shop.image || "");
     productList.innerHTML = "";
     const products = shop.products && shop.products.length ? shop.products : [{}];
@@ -312,7 +358,7 @@
     productList.innerHTML = "";
     addProduct();
     showImagePreview("");
-    imageHint.textContent = "Or upload a photo (max 1.5 MB)";
+    imageHint.textContent = "Or upload a shop photo (compressed before sync)";
     setStatus("");
   }
 
@@ -337,13 +383,16 @@
     }
 
     const shops = loadShops();
+    const previous = editingId ? shops.find((shop) => shop.id === editingId) : null;
+    // Keep the existing enrolled photo when editing without a new upload.
+    const resolvedImage = image || (previous && hasUsableImage(previous.image) ? previous.image : "");
     const id = editingId || `${slugify(name)}-${Date.now().toString(36)}`;
     const payload = {
       id,
       name,
       floor,
       number,
-      image,
+      image: resolvedImage,
       description,
       link,
       products: products.map((product, index) => ({
@@ -375,7 +424,7 @@
   form.image.addEventListener("input", () => {
     if (form.image.value.trim()) {
       uploadedImageDataUrl = "";
-      imageHint.textContent = "Or upload a photo (max 1.5 MB)";
+      imageHint.textContent = "Or upload a shop photo (compressed before sync)";
       showImagePreview(form.image.value.trim());
     } else if (!uploadedImageDataUrl) {
       showImagePreview("");
@@ -391,7 +440,7 @@
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setStatus("Image is too large. Keep uploads under 1.5 MB.", true);
+      setStatus("Image is too large. Keep uploads under 8 MB.", true);
       form.imageFile.value = "";
       return;
     }

@@ -2,7 +2,13 @@
   const CATALOG_URL =
     document.querySelector('meta[name="tsm-catalog-url"]')?.content?.trim() ||
     "https://ai-mallbot.onrender.com/catalog";
-  const FALLBACK_IMAGE = "/trade-square-day.png";
+  const CATALOG_ORIGIN = (() => {
+    try {
+      return new URL(CATALOG_URL).origin;
+    } catch {
+      return "https://ai-mallbot.onrender.com";
+    }
+  })();
   const MARK = "data-enrolled-shop";
   const SHOP_PATH = "/shop";
 
@@ -45,10 +51,27 @@
     return floor || number || "Trade Square Mall";
   }
 
+  /** Prefer the enrolled shop photo (absolute /media URL), then a product photo. */
+  function resolveShopImage(raw) {
+    const candidates = [
+      raw?.image,
+      ...(Array.isArray(raw?.products) ? raw.products.map((p) => p?.image) : []),
+    ];
+    for (const candidate of candidates) {
+      const value = String(candidate || "").trim();
+      if (!value || value.startsWith("data:")) continue;
+      if (value.startsWith("/media/")) return `${CATALOG_ORIGIN}${value}`;
+      if (/^https?:\/\//i.test(value)) return value;
+    }
+    return "";
+  }
+
   function normalizeShop(raw) {
     if (!raw || typeof raw !== "object") return null;
     const name = String(raw.name || "").trim();
     if (!name) return null;
+    // Skip seed / non-enrolled entries if a live merge ever leaks through
+    if (raw.enrolled === false) return null;
     const id = String(raw.id || name)
       .toLowerCase()
       .trim()
@@ -60,7 +83,7 @@
       name,
       floor: String(raw.floor || "").trim(),
       number: String(raw.number || "").trim(),
-      image: String(raw.image || "").trim(),
+      image: resolveShopImage(raw),
       description: String(raw.description || "").trim(),
       link: String(raw.link || raw.whatsapp || "").trim(),
       categories: Array.isArray(raw.categories) ? raw.categories : [],
@@ -75,6 +98,7 @@
         .then(async (res) => {
           if (!res.ok) throw new Error(`catalog ${res.status}`);
           const data = await res.json();
+          // Prefer normalized enrolled shops only — never the seed/live merge.
           const list = Array.isArray(data?.normalized)
             ? data.normalized
             : Array.isArray(data?.shops)
@@ -95,11 +119,14 @@
     const href = forceReload
       ? `${SHOP_PATH}?shop=${encodeURIComponent(shop.id)}`
       : `${SHOP_PATH}#${encodeURIComponent(shop.id)}`;
-    const img = shop.image || FALLBACK_IMAGE;
+    const img = shop.image;
     const cat = categoryFor(shop);
+    const media = img
+      ? `<img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" loading="lazy" />`
+      : `<div class="card-media__placeholder" aria-hidden="true">${escapeHtml(shop.name.slice(0, 1))}</div>`;
     return `<a class="card" href="${escapeAttr(href)}" ${MARK}="${escapeAttr(shop.id)}">
       <div class="card-media">
-        <img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" loading="lazy" />
+        ${media}
       </div>
       <div class="card-body">
         <p class="kicker">${escapeHtml(cat)}</p>
@@ -110,9 +137,29 @@
     </a>`;
   }
 
+  /** Hide SPA seed shop cards (Barbers, Salons, …) — website shows enrolled tenants only. */
+  function hideNonEnrolledSeedShops() {
+    const shopSection = document.getElementById("shop");
+    if (!shopSection) return;
+
+    shopSection.querySelectorAll(".card-grid").forEach((grid) => {
+      if (grid.closest("[data-enrolled-home]")) return;
+      grid.hidden = true;
+      grid.setAttribute("data-seed-shops-hidden", "1");
+    });
+
+    shopSection.querySelectorAll(".section-head").forEach((head) => {
+      if (head.closest("[data-enrolled-home]")) return;
+      head.hidden = true;
+      head.setAttribute("data-seed-shops-hidden", "1");
+    });
+  }
+
   function ensureHomeSection(shops) {
     const shopSection = document.getElementById("shop");
-    if (!shopSection || !shops.length) return;
+    if (!shopSection) return;
+
+    hideNonEnrolledSeedShops();
 
     let host = shopSection.querySelector("[data-enrolled-home]");
     if (!host) {
@@ -125,9 +172,24 @@
       else wrap.appendChild(host);
     }
 
-    const signature = shops.map((s) => s.id).join("|");
+    const signature = shops.map((s) => `${s.id}:${s.image}`).join("|");
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
+
+    if (!shops.length) {
+      host.innerHTML = `
+        <div class="section-head enrolled-home__head">
+          <div>
+            <p class="kicker">Open now</p>
+            <h2>Enrolled shops</h2>
+          </div>
+          <a class="text-link" href="/enroll/">Enrol a shop <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="enrolled-home__empty">No shops enrolled yet. Tenants can join from Enrol.</p>
+      `;
+      return;
+    }
+
     host.innerHTML = `
       <div class="section-head enrolled-home__head">
         <div>
@@ -151,7 +213,7 @@
     if (document.getElementById("shops-grid")) return;
 
     const body = document.querySelector(".directory-body");
-    if (!body || !shops.length) return;
+    if (!body) return;
 
     let rail = body.querySelector("[data-enrolled-directory]");
     if (!rail) {
@@ -162,9 +224,23 @@
       body.appendChild(rail);
     }
 
-    const signature = shops.map((s) => s.id).join("|");
+    const signature = shops.map((s) => `${s.id}:${s.image}`).join("|");
     if (rail.dataset.signature === signature) return;
     rail.dataset.signature = signature;
+
+    if (!shops.length) {
+      rail.innerHTML = `
+        <div class="section-head enrolled-directory__head">
+          <div>
+            <p class="kicker">Trade Square Mall · Kwekwe</p>
+            <h2>Enrolled shops</h2>
+          </div>
+        </div>
+        <p class="enrolled-directory__note">No shops enrolled yet. Tenants can join from Enrol.</p>
+      `;
+      return;
+    }
+
     rail.innerHTML = `
       <div class="section-head enrolled-directory__head">
         <div>
@@ -207,8 +283,8 @@
   let paintTimer = 0;
   async function paint() {
     forceShopLinks();
+    hideNonEnrolledSeedShops();
     const shops = await loadShops();
-    if (!shops.length) return;
     ensureHomeSection(shops);
     ensureDirectoryRail(shops);
   }

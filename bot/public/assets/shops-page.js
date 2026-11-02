@@ -2,7 +2,13 @@
   const CATALOG_URL =
     document.querySelector('meta[name="tsm-catalog-url"]')?.content?.trim() ||
     "https://ai-mallbot.onrender.com/catalog";
-  const FALLBACK_IMAGE = "/trade-square-day.png";
+  const CATALOG_ORIGIN = (() => {
+    try {
+      return new URL(CATALOG_URL).origin;
+    } catch {
+      return "https://ai-mallbot.onrender.com";
+    }
+  })();
 
   const listEl = document.getElementById("shops-list");
   const detailEl = document.getElementById("shops-detail");
@@ -51,10 +57,26 @@
     return `${clean.slice(0, max - 1).trimEnd()}…`;
   }
 
+  /** Prefer the enrolled shop photo, then a product photo. Never use mall stock art. */
+  function resolveShopImage(raw) {
+    const candidates = [
+      raw?.image,
+      ...(Array.isArray(raw?.products) ? raw.products.map((p) => p?.image) : []),
+    ];
+    for (const candidate of candidates) {
+      const value = String(candidate || "").trim();
+      if (!value || value.startsWith("data:")) continue;
+      if (value.startsWith("/media/")) return `${CATALOG_ORIGIN}${value}`;
+      if (/^https?:\/\//i.test(value)) return value;
+    }
+    return "";
+  }
+
   function normalizeShop(raw) {
     if (!raw || typeof raw !== "object") return null;
     const name = String(raw.name || "").trim();
     if (!name) return null;
+    if (raw.enrolled === false) return null;
     const id = String(raw.id || name)
       .toLowerCase()
       .trim()
@@ -66,7 +88,7 @@
       name,
       floor: String(raw.floor || "").trim(),
       number: String(raw.number || "").trim(),
-      image: String(raw.image || "").trim(),
+      image: resolveShopImage(raw),
       description: String(raw.description || "").trim(),
       link: String(raw.link || raw.whatsapp || "").trim(),
       whatsapp: String(raw.whatsapp || raw.link || "").trim(),
@@ -90,10 +112,13 @@
   }
 
   function cardHtml(shop) {
-    const img = shop.image || FALLBACK_IMAGE;
+    const img = shop.image;
+    const media = img
+      ? `<img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" loading="lazy" />`
+      : `<div class="card-media__placeholder" aria-hidden="true">${escapeHtml(shop.name.slice(0, 1))}</div>`;
     return `<a class="card" href="#${escapeAttr(shop.id)}">
       <div class="card-media">
-        <img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" loading="lazy" />
+        ${media}
       </div>
       <div class="card-body">
         <p class="kicker">${escapeHtml(categoryFor(shop))}</p>
@@ -135,12 +160,15 @@
       return;
     }
 
-    const img = shop.image || FALLBACK_IMAGE;
+    const img = shop.image;
     const chat = shop.whatsapp || shop.link;
     document.title = `${shop.name} · Trade Square Mall`;
     listEl.hidden = true;
     detailEl.hidden = false;
     detailEl.classList.add("is-open");
+    const hero = img
+      ? `<img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" />`
+      : `<div class="card-media__placeholder shops-detail__placeholder" aria-hidden="true">${escapeHtml(shop.name.slice(0, 1))}</div>`;
     detailEl.innerHTML = `
       <div class="wrap">
         <p class="shops-detail__back">
@@ -157,7 +185,7 @@
           }
         </header>
         <div class="shops-detail__hero">
-          <img src="${escapeAttr(img)}" alt="${escapeAttr(shop.name)}" />
+          ${hero}
         </div>
         <div class="shops-detail__body">
           <div>
@@ -239,6 +267,7 @@
       const res = await fetch(CATALOG_URL, { method: "GET", mode: "cors", cache: "no-store" });
       if (!res.ok) throw new Error(`catalog ${res.status}`);
       const data = await res.json();
+      // Enrolled shops only — never seed / non-enrolled live merge entries.
       const list = Array.isArray(data?.normalized)
         ? data.normalized
         : Array.isArray(data?.shops)
