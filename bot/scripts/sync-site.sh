@@ -7,7 +7,7 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -a "$ROOT/index.html" "$ROOT/favicon.svg" \
   "$ROOT/trade-square-day.png" "$ROOT/trade-square-night.png" "$DEST/"
-for img in featured-barber-salon.jpg featured-clothes.jpg featured-shoes.jpg rooftop-lounge.jpg; do
+for img in featured-barber-salon.jpg featured-clothes.jpg featured-shoes.jpg rooftop-lounge.jpg featured-barber.mp4 featured-sneakers.mp4 featured-fashion.mp4; do
   if [[ -f "$ROOT/$img" ]]; then
     cp -a "$ROOT/$img" "$DEST/"
   fi

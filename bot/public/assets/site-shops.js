@@ -183,14 +183,14 @@
       slug: "barbers",
       name: "Barber and saloon",
       text: "Cuts, wash, style, and colour on the ground floor.",
-      videoId: "1F2kq3I503qPmfZAkvLwoxG720OFCPmpB",
+      video: "/featured-barber.mp4",
       title: "Barber and saloon video",
     },
     {
       slug: "shoes",
       name: "Sneaker shops",
       text: "Trainers and everyday footwear on the shop floor.",
-      videoId: "1ofrq65YtakkdrM-nsNbjH5YaZtCcIqT1",
+      video: "/featured-sneakers.mp4",
       title: "Sneaker shops video",
       href: "/shop",
     },
@@ -198,18 +198,14 @@
       slug: "clothing",
       name: "Fashion shops",
       text: "Clothing and fashion on the upper floor.",
-      videoId: "1c2Xr3gtk5TN8gJOq1_EDZzppmtCER721",
+      video: "/featured-fashion.mp4",
       title: "Fashion shops video",
     },
   ];
 
-  const FEATURED_VERSION = "videos-v1";
+  const FEATURED_VERSION = "videos-v2-loop";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
-
-  function drivePreview(id) {
-    return `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
-  }
 
   function ensureFeaturedShops() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -242,13 +238,16 @@
             (shop) => `
             <a class="featured-shop" href="${escapeAttr(shop.href || `/shop/${shop.slug}`)}">
               <div class="featured-shop-media">
-                <iframe
-                  src="${escapeAttr(drivePreview(shop.videoId))}"
+                <video
+                  class="featured-shop-video"
+                  src="${escapeAttr(shop.video)}"
                   title="${escapeAttr(shop.title)}"
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowfullscreen
-                  loading="lazy"
-                ></iframe>
+                  autoplay
+                  muted
+                  loop
+                  playsinline
+                  preload="auto"
+                ></video>
               </div>
               <div class="featured-shop-copy">
                 <h3>${escapeHtml(shop.name)}</h3>
@@ -260,6 +259,13 @@
         </div>
       </div>
     `;
+
+    host.querySelectorAll(".featured-shop-video").forEach((video) => {
+      video.muted = true;
+      const play = () => video.play().catch(() => {});
+      if (video.readyState >= 2) play();
+      else video.addEventListener("canplay", play, { once: true });
+    });
   }
 
   function ensureRooftopImages() {

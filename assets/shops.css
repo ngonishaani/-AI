@@ -200,8 +200,8 @@
   position: relative;
 }
 
-.featured-shop-media iframe,
-.featured-shop-media video {
+.featured-shop-media video,
+.featured-shop-video {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -209,6 +209,9 @@
   border: 0;
   pointer-events: none;
   object-fit: cover;
+  object-position: center;
+  display: block;
+  background: #0d2e28;
 }
 
 .featured-shop-copy {

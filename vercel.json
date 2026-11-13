@@ -39,13 +39,20 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!assets/|hero-bg\\.mp4|featured-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/((?!assets/|hero-bg\\.mp4|featured-.*\\.(jpg|mp4)|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
       "source": "/hero-bg.mp4",
+      "headers": [
+        { "key": "Content-Type", "value": "video/mp4" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/featured-(barber|sneakers|fashion).mp4",
       "headers": [
         { "key": "Content-Type", "value": "video/mp4" },
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
