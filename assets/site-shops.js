@@ -203,7 +203,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v2-loop";
+  const FEATURED_VERSION = "videos-v3-overlay";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
 
@@ -246,8 +246,12 @@
                   muted
                   loop
                   playsinline
+                  webkit-playsinline
                   preload="auto"
+                  disablepictureinpicture
+                  controlslist="nodownload nofullscreen noremoteplayback"
                 ></video>
+                <span class="featured-shop-overlay" aria-hidden="true"></span>
               </div>
               <div class="featured-shop-copy">
                 <h3>${escapeHtml(shop.name)}</h3>
@@ -261,8 +265,22 @@
     `;
 
     host.querySelectorAll(".featured-shop-video").forEach((video) => {
+      video.removeAttribute("controls");
+      video.controls = false;
       video.muted = true;
-      const play = () => video.play().catch(() => {});
+      video.defaultMuted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      const play = () => {
+        video.muted = true;
+        return video.play().catch(() => {});
+      };
+      play();
+      video.addEventListener("pause", () => {
+        if (!video.ended) play();
+      });
       if (video.readyState >= 2) play();
       else video.addEventListener("canplay", play, { once: true });
     });
