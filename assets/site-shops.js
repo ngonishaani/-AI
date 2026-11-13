@@ -178,6 +178,106 @@
     `;
   }
 
+  const FEATURED = [
+    {
+      slug: "barbers",
+      name: "Barber and saloons",
+      text: "Cuts, wash, style, and colour on the ground floor.",
+      image: "/featured-barber-salon.jpg",
+      alt: "Barber chairs and salon stations inside the mall",
+    },
+    {
+      slug: "shoes",
+      name: "Shoes",
+      text: "Trainers, formal pairs, and everyday footwear.",
+      image: "/featured-shoes.jpg",
+      alt: "Shoe displays on shelves in a mall footwear shop",
+      href: "/shop",
+    },
+    {
+      slug: "clothing",
+      name: "Clothes",
+      text: "Fashion shops on the upper floor.",
+      image: "/featured-clothes.jpg",
+      alt: "Clothing racks in a boutique at Trade Square Mall",
+    },
+  ];
+
+  const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
+  const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  function ensureFeaturedShops() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+
+    const hero = document.querySelector(".studio-hero");
+    if (!hero || !hero.parentNode) return;
+
+    let host = document.querySelector("[data-featured-shops]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section";
+      host.setAttribute("data-featured-shops", "1");
+      hero.insertAdjacentElement("afterend", host);
+    }
+
+    if (host.dataset.ready === "1") return;
+    host.dataset.ready = "1";
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Featured shops</p>
+            <h2>Barber and saloons, shoes, and clothes.</h2>
+          </div>
+          <a class="text-link" href="${SHOP_PATH}">All shops <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="featured-shops">
+          ${FEATURED.map(
+            (shop) => `
+            <a class="featured-shop" href="${escapeAttr(shop.href || `/shop/${shop.slug}`)}">
+              <div class="featured-shop-media">
+                <img src="${escapeAttr(shop.image)}" alt="${escapeAttr(shop.alt)}" loading="lazy" />
+              </div>
+              <div class="featured-shop-copy">
+                <h3>${escapeHtml(shop.name)}</h3>
+                <p>${escapeHtml(shop.text)}</p>
+                <span class="text-link">Open shop <span aria-hidden="true">→</span></span>
+              </div>
+            </a>`
+          ).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function ensureRooftopImages() {
+    const selectors = [
+      'a[href="/dine/rooftop-lounge"] img',
+      'a[href="/dine/cocktail-bar"] img',
+      'img[alt*="Rooftop Lounge"]',
+      'img[alt*="cocktail bar"]',
+      'img[alt*="Cocktail bar"]',
+      'img[alt*="signage at night"]',
+    ];
+    document.querySelectorAll(selectors.join(",")).forEach((img) => {
+      if (img.dataset.rooftopSwap === "1") return;
+      img.dataset.rooftopSwap = "1";
+      img.src = ROOFTOP_IMAGE;
+      img.alt = ROOFTOP_ALT;
+    });
+
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/dine/rooftop-lounge" || path === "/dine/cocktail-bar") {
+      document.querySelectorAll(".place-hero img, .feature-media img, .card-media img").forEach((img) => {
+        if (img.dataset.rooftopSwap === "1") return;
+        img.dataset.rooftopSwap = "1";
+        img.src = ROOFTOP_IMAGE;
+        img.alt = ROOFTOP_ALT;
+      });
+    }
+  }
+
   function forceShopLinks() {
     document.querySelectorAll('a[href="/shops"], a[href="/shops/"]').forEach((a) => {
       a.setAttribute("href", SHOP_PATH);
@@ -207,6 +307,8 @@
   let paintTimer = 0;
   async function paint() {
     forceShopLinks();
+    ensureFeaturedShops();
+    ensureRooftopImages();
     const shops = await loadShops();
     if (!shops.length) return;
     ensureHomeSection(shops);
