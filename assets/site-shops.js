@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v9-polish";
+  const FEATURED_VERSION = "videos-v10-trim";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -472,7 +472,6 @@
           <h2>Trade Square Mall</h2>
           <p class="welcome-intro-lead">Kwekwe’s premier shopping and lifestyle destination in the CBD.</p>
           <p>Opposite the main rank at Stand 7633, steps from the farmers market.</p>
-          <p>Shop, dine, work, and unwind on the rooftop beside the iconic I ❤️ KWEKWE sign.</p>
         </div>
       </div>
     `;
