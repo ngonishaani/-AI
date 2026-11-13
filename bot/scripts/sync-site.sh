@@ -13,8 +13,8 @@ for img in featured-barber-salon.jpg featured-clothes.jpg featured-shoes.jpg roo
   fi
 done
 cp -a "$ROOT/assets" "$ROOT/shop" "$ROOT/shops" "$ROOT/enroll" "$ROOT/enrol" "$DEST/"
-# Optional large hero video
-if [[ "${SYNC_HERO_VIDEO:-0}" == "1" && -f "$ROOT/hero-bg.mp4" ]]; then
+# Hero video used by the homepage background
+if [[ -f "$ROOT/hero-bg.mp4" ]]; then
   cp -a "$ROOT/hero-bg.mp4" "$DEST/"
 fi
 echo "Synced site → $DEST ($(du -sh "$DEST" | awk '{print $1}'))"
