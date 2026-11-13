@@ -39,7 +39,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!assets/|hero-bg\\.mp4|featured-.*\\.(jpg|mp4)|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/((?!assets/|hero-bg\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ],
