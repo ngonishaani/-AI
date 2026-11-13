@@ -18,7 +18,7 @@
     />
     <script type="module" crossorigin src="/assets/index-1067299b.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-1c19cfd8.css">
-    <link rel="stylesheet" href="/assets/shops.css?v=7" />
+    <link rel="stylesheet" href="/assets/shops.css?v=8" />
     <meta name="tsm-catalog-url" content="https://ai-mallbot.onrender.com/catalog" />
       <link rel="preload" href="/hero-bg.mp4" as="video" type="video/mp4" />
   </head>
@@ -63,43 +63,7 @@
   else scan();
 })();
 </script>
-<script>
-(function () {
-  function addEnrolLinks() {
-    document.querySelectorAll(".nav-links").forEach(function (nav) {
-      if (nav.querySelector('[data-enrol-link="1"]')) return;
-      var a = document.createElement("a");
-      a.href = "/enroll/";
-      a.textContent = "Enrol";
-      a.setAttribute("data-enrol-link", "1");
-      nav.appendChild(a);
-    });
-    document.querySelectorAll(".menu nav").forEach(function (nav) {
-      if (nav.querySelector('[data-enrol-link="1"]')) return;
-      var a = document.createElement("a");
-      a.href = "/enroll/";
-      a.textContent = "Enrol";
-      a.setAttribute("data-enrol-link", "1");
-      nav.appendChild(a);
-    });
-    document.querySelectorAll(".footer-grid ul").forEach(function (list, index) {
-      if (index !== 0 || list.querySelector('[data-enrol-link="1"]')) return;
-      var li = document.createElement("li");
-      var a = document.createElement("a");
-      a.href = "/enroll/";
-      a.textContent = "Enrol a shop";
-      a.setAttribute("data-enrol-link", "1");
-      li.appendChild(a);
-      list.appendChild(li);
-    });
-  }
-  var obs = new MutationObserver(addEnrolLinks);
-  obs.observe(document.documentElement, { childList: true, subtree: true });
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addEnrolLinks);
-  else addEnrolLinks();
-})();
-</script>
-<script src="/assets/site-shops.js?v=7" defer></script>
+<script src="/assets/site-shops.js?v=8" defer></script>
 
   </body>
 </html>

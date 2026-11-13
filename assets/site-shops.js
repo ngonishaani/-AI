@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v7-rooftop-text-top";
+  const FEATURED_VERSION = "videos-v8-welcome-nav";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -353,12 +353,61 @@
     });
   }
 
-  function placeHomeSections(rooftopText, featured, floors, rooftopImage) {
+  function hideBrokenNav() {
+    const hideHref = (href) => {
+      const path = String(href || "").replace(/\/+$/, "") || "/";
+      return (
+        path === "/enroll" ||
+        path === "/enrol" ||
+        path === "/shop" ||
+        path === "/shops" ||
+        path === "/dine" ||
+        path === "/events" ||
+        path === "/visit" ||
+        /\/shop\//.test(path) ||
+        /\/dine\//.test(path) ||
+        /enroll/i.test(path)
+      );
+    };
+
+    document.querySelectorAll(".nav-links a, .menu nav a, .footer-grid a, header a, .menu a").forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (hideHref(href) || /enrol/i.test(a.textContent || "")) {
+        const li = a.closest("li");
+        if (li) removeNode(li);
+        else removeNode(a);
+      }
+    });
+
+    document.querySelectorAll('[data-enrol-link="1"]').forEach(removeNode);
+
+    // Hide Menu control when nav items are cleared
+    document.querySelectorAll("button, a").forEach((el) => {
+      if (/^menu$/i.test((el.textContent || "").trim())) {
+        el.style.display = "none";
+        el.setAttribute("aria-hidden", "true");
+      }
+    });
+    document.querySelectorAll(".menu").forEach((menu) => {
+      menu.style.display = "none";
+      menu.setAttribute("hidden", "");
+    });
+
+    // Hide hero CTAs that point at incomplete flows
+    document.querySelectorAll(".hero-actions a, .studio-copy a").forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (hideHref(href) || /browse the shops/i.test(a.textContent || "")) {
+        removeNode(a);
+      }
+    });
+  }
+
+  function placeHomeSections(welcome, featured, floors, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Rooftop text → Featured shops → Floors guide
-    hero.insertAdjacentElement("afterend", rooftopText);
-    rooftopText.insertAdjacentElement("afterend", featured);
+    // Under hero: Welcome → Featured shops → Floors guide
+    hero.insertAdjacentElement("afterend", welcome);
+    welcome.insertAdjacentElement("afterend", featured);
     featured.insertAdjacentElement("afterend", floors);
     // Rooftop image at the bottom of the page content
     const anchor =
@@ -376,25 +425,24 @@
     }
   }
 
-  function ensureRooftopHomeText() {
+  function ensureWelcomeIntro() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return null;
 
-    let host = document.querySelector("[data-rooftop-home-text]");
+    let host = document.querySelector("[data-welcome-intro]");
     if (!host) {
       host = document.createElement("section");
-      host.className = "section section--tight";
-      host.setAttribute("data-rooftop-home-text", "1");
+      host.className = "section";
+      host.setAttribute("data-welcome-intro", "1");
     }
     if (host.dataset.ready === FEATURED_VERSION) return host;
     host.dataset.ready = FEATURED_VERSION;
     host.innerHTML = `
       <div class="wrap">
-        <div class="rooftop-home-text">
-          <p class="kicker">At the top</p>
-          <h2>Rooftop Lounge</h2>
-          <p>The lounge sits above the mall with Trade Square signage across the roof. Come up for evenings overlooking Kwekwe.</p>
-          <a class="text-link" href="/dine/rooftop-lounge">See Rooftop Lounge <span aria-hidden="true">→</span></a>
+        <div class="welcome-intro">
+          <p class="kicker">Welcome</p>
+          <h2>Welcome to Trade Square Mall – Kwekwe’s Premier Shopping &amp; Lifestyle Destination</h2>
+          <p>Located right in the heart of the Kwekwe CBD at Stand 7633—conveniently opposite the main rank and just steps from the farmers market—Trade Square Mall is a modern, three-storey commercial hub designed to elevate your everyday shopping, dining, and business experience. Spanning three vibrant levels, our state-of-the-art complex brings together an eclectic mix of retail boutiques, trendy thrift stores, beauty salons, fast-food outlets, professional office spaces, and a fully equipped gym. After a day of shopping or working, head up to our signature rooftop bar and lounge to unwind, enjoy great company, and take in the city views beside our iconic "I ❤️ KWEKWE" display.</p>
         </div>
       </div>
     `;
@@ -535,12 +583,12 @@
   function ensureHomeSections() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return;
-    const rooftopText = ensureRooftopHomeText();
+    const welcome = ensureWelcomeIntro();
     const featured = ensureFeaturedShops();
     const floors = ensureFloorsGuide();
     const rooftopImage = ensureRooftopHomeImage();
-    if (rooftopText && featured && floors && rooftopImage) {
-      placeHomeSections(rooftopText, featured, floors, rooftopImage);
+    if (welcome && featured && floors && rooftopImage) {
+      placeHomeSections(welcome, featured, floors, rooftopImage);
     }
   }
 
@@ -600,10 +648,12 @@
   let paintTimer = 0;
   async function paint() {
     forceShopLinks();
+    hideBrokenNav();
     cleanLandingPage();
     ensureHomeSections();
     ensureTourVideo();
     ensureRooftopImages();
+    hideBrokenNav();
     cleanLandingPage();
     const path = location.pathname.replace(/\/+$/, "") || "/";
     // Keep enrolled shops off the landing page; still sync /shop directory.
