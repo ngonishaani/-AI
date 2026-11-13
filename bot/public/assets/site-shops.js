@@ -181,30 +181,35 @@
   const FEATURED = [
     {
       slug: "barbers",
-      name: "Barber and saloons",
+      name: "Barber and saloon",
       text: "Cuts, wash, style, and colour on the ground floor.",
-      image: "/featured-barber-salon.jpg",
-      alt: "Barber chairs and salon stations inside the mall",
+      videoId: "1F2kq3I503qPmfZAkvLwoxG720OFCPmpB",
+      title: "Barber and saloon video",
     },
     {
       slug: "shoes",
-      name: "Shoes",
-      text: "Trainers, formal pairs, and everyday footwear.",
-      image: "/featured-shoes.jpg",
-      alt: "Shoe displays on shelves in a mall footwear shop",
+      name: "Sneaker shops",
+      text: "Trainers and everyday footwear on the shop floor.",
+      videoId: "1ofrq65YtakkdrM-nsNbjH5YaZtCcIqT1",
+      title: "Sneaker shops video",
       href: "/shop",
     },
     {
       slug: "clothing",
-      name: "Clothes",
-      text: "Fashion shops on the upper floor.",
-      image: "/featured-clothes.jpg",
-      alt: "Clothing racks in a boutique at Trade Square Mall",
+      name: "Fashion shops",
+      text: "Clothing and fashion on the upper floor.",
+      videoId: "1c2Xr3gtk5TN8gJOq1_EDZzppmtCER721",
+      title: "Fashion shops video",
     },
   ];
 
+  const FEATURED_VERSION = "videos-v1";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  function drivePreview(id) {
+    return `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
+  }
 
   function ensureFeaturedShops() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -221,14 +226,14 @@
       hero.insertAdjacentElement("afterend", host);
     }
 
-    if (host.dataset.ready === "1") return;
-    host.dataset.ready = "1";
+    if (host.dataset.ready === FEATURED_VERSION) return;
+    host.dataset.ready = FEATURED_VERSION;
     host.innerHTML = `
       <div class="wrap">
         <div class="section-head">
           <div>
             <p class="kicker">Featured shops</p>
-            <h2>Barber and saloons, shoes, and clothes.</h2>
+            <h2>Barber and saloon, sneakers, and fashion.</h2>
           </div>
           <a class="text-link" href="${SHOP_PATH}">All shops <span aria-hidden="true">→</span></a>
         </div>
@@ -237,7 +242,13 @@
             (shop) => `
             <a class="featured-shop" href="${escapeAttr(shop.href || `/shop/${shop.slug}`)}">
               <div class="featured-shop-media">
-                <img src="${escapeAttr(shop.image)}" alt="${escapeAttr(shop.alt)}" loading="lazy" />
+                <iframe
+                  src="${escapeAttr(drivePreview(shop.videoId))}"
+                  title="${escapeAttr(shop.title)}"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowfullscreen
+                  loading="lazy"
+                ></iframe>
               </div>
               <div class="featured-shop-copy">
                 <h3>${escapeHtml(shop.name)}</h3>
