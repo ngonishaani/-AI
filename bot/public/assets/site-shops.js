@@ -203,9 +203,57 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v4-clean-home";
+  const FEATURED_VERSION = "videos-v5-fashion-tour";
+  const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  function bindLoopVideo(video) {
+    if (!video || video.dataset.boundLoop === "1") return;
+    video.dataset.boundLoop = "1";
+    video.removeAttribute("controls");
+    video.controls = false;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    const play = () => {
+      video.muted = true;
+      return video.play().catch(() => {});
+    };
+    play();
+    video.addEventListener("pause", () => {
+      if (!video.ended) play();
+    });
+    if (video.readyState >= 2) play();
+    else video.addEventListener("canplay", play, { once: true });
+  }
+
+  function ensureTourVideo() {
+    const frame = document.querySelector(".tour-frame");
+    if (!frame) return;
+    if (frame.dataset.tourVideo === FEATURED_VERSION) return;
+    frame.dataset.tourVideo = FEATURED_VERSION;
+    frame.innerHTML = `
+      <video
+        class="tour-aerial-video"
+        src="${TOUR_VIDEO}"
+        title="Trade Square Mall feature tour"
+        autoplay
+        muted
+        loop
+        playsinline
+        webkit-playsinline
+        preload="auto"
+        disablepictureinpicture
+        controlslist="nodownload nofullscreen noremoteplayback"
+      ></video>
+      <span class="tour-aerial-overlay" aria-hidden="true"></span>
+    `;
+    bindLoopVideo(frame.querySelector(".tour-aerial-video"));
+  }
 
   function removeNode(node) {
     if (node && node.parentNode) node.parentNode.removeChild(node);
@@ -352,26 +400,7 @@
       </div>
     `;
 
-    host.querySelectorAll(".featured-shop-video").forEach((video) => {
-      video.removeAttribute("controls");
-      video.controls = false;
-      video.muted = true;
-      video.defaultMuted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.setAttribute("muted", "");
-      video.setAttribute("playsinline", "");
-      const play = () => {
-        video.muted = true;
-        return video.play().catch(() => {});
-      };
-      play();
-      video.addEventListener("pause", () => {
-        if (!video.ended) play();
-      });
-      if (video.readyState >= 2) play();
-      else video.addEventListener("canplay", play, { once: true });
-    });
+    host.querySelectorAll(".featured-shop-video").forEach(bindLoopVideo);
   }
 
   function ensureRooftopImages() {
@@ -432,6 +461,7 @@
     forceShopLinks();
     cleanLandingPage();
     ensureFeaturedShops();
+    ensureTourVideo();
     ensureRooftopImages();
     cleanLandingPage();
     const path = location.pathname.replace(/\/+$/, "") || "/";
