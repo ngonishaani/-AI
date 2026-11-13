@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v8-welcome-nav";
+  const FEATURED_VERSION = "videos-v9-polish";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -393,36 +393,64 @@
       menu.setAttribute("hidden", "");
     });
 
-    // Hide hero CTAs that point at incomplete flows
+    // Keep Browse the shops; hide other incomplete hero CTAs (e.g. Book a tour / visit)
     document.querySelectorAll(".hero-actions a, .studio-copy a").forEach((a) => {
+      if (/browse the shops/i.test(a.textContent || "")) return;
       const href = a.getAttribute("href") || "";
-      if (hideHref(href) || /browse the shops/i.test(a.textContent || "")) {
-        removeNode(a);
-      }
+      if (hideHref(href)) removeNode(a);
     });
   }
 
-  function placeHomeSections(welcome, featured, floors, rooftopImage) {
+  function ensureHeroBrowseButton() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+    const actions = document.querySelector(".hero-actions");
+    if (!actions) return;
+    const existing = [...actions.querySelectorAll("a")].find((a) =>
+      /browse the shops/i.test(a.textContent || "")
+    );
+    if (existing) {
+      existing.classList.add("btn");
+      existing.href = "/shop";
+      return;
+    }
+    const btn = document.createElement("a");
+    btn.className = "btn";
+    btn.href = "/shop";
+    btn.textContent = "Browse the shops";
+    actions.insertBefore(btn, actions.firstChild);
+  }
+
+  function removeDuplicateMapAndHours() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+
+    const maps = [...document.querySelectorAll(".map-frame, [data-map='tradesquare']")];
+    maps.slice(1).forEach((el) => removeNode(el.closest("section") || el.closest(".map-block") || el));
+
+    const hours = [...document.querySelectorAll("table.hours")];
+    hours.slice(1).forEach((el) => removeNode(el.closest("section") || el.closest(".split") || el));
+
+    // Drop a second "Plan your day" / hours block if Find us already covers the map
+    const planSections = [...document.querySelectorAll("section, .section")].filter((section) =>
+      textMatches(section.querySelector("h1, h2"), /plan your day|when the doors are open/i)
+    );
+    if (planSections.length > 1) {
+      planSections.slice(1).forEach(removeNode);
+    }
+  }
+
+  function placeHomeSections(welcome, featured, floors, amenities, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Welcome → Featured shops → Floors guide
+    // Under hero: Welcome → Featured → Floors → Amenities → Rooftop image near end
     hero.insertAdjacentElement("afterend", welcome);
     welcome.insertAdjacentElement("afterend", featured);
     featured.insertAdjacentElement("afterend", floors);
-    // Rooftop image at the bottom of the page content
-    const anchor =
-      document.querySelector("footer") ||
-      document.querySelector(".visit-banner")?.closest("section") ||
-      floors;
-    if (anchor && anchor.parentNode) {
-      if (anchor.matches("footer")) anchor.insertAdjacentElement("beforebegin", rooftopImage);
-      else floors.insertAdjacentElement("afterend", rooftopImage);
-      // Keep image as the last section before footer if footer exists
-      const footer = document.querySelector("footer");
-      if (footer && rooftopImage.nextElementSibling !== footer) {
-        footer.insertAdjacentElement("beforebegin", rooftopImage);
-      }
-    }
+    floors.insertAdjacentElement("afterend", amenities);
+    const footer = document.querySelector("footer");
+    if (footer) footer.insertAdjacentElement("beforebegin", rooftopImage);
+    else amenities.insertAdjacentElement("afterend", rooftopImage);
   }
 
   function ensureWelcomeIntro() {
@@ -441,8 +469,49 @@
       <div class="wrap">
         <div class="welcome-intro">
           <p class="kicker">Welcome</p>
-          <h2>Welcome to Trade Square Mall – Kwekwe’s Premier Shopping &amp; Lifestyle Destination</h2>
-          <p>Located right in the heart of the Kwekwe CBD at Stand 7633—conveniently opposite the main rank and just steps from the farmers market—Trade Square Mall is a modern, three-storey commercial hub designed to elevate your everyday shopping, dining, and business experience. Spanning three vibrant levels, our state-of-the-art complex brings together an eclectic mix of retail boutiques, trendy thrift stores, beauty salons, fast-food outlets, professional office spaces, and a fully equipped gym. After a day of shopping or working, head up to our signature rooftop bar and lounge to unwind, enjoy great company, and take in the city views beside our iconic "I ❤️ KWEKWE" display.</p>
+          <h2>Trade Square Mall</h2>
+          <p class="welcome-intro-lead">Kwekwe’s premier shopping and lifestyle destination in the CBD.</p>
+          <p>Opposite the main rank at Stand 7633, steps from the farmers market.</p>
+          <p>Shop, dine, work, and unwind on the rooftop beside the iconic I ❤️ KWEKWE sign.</p>
+        </div>
+      </div>
+    `;
+    return host;
+  }
+
+  function ensureAmenitiesHome() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.querySelector("[data-amenities-home]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section";
+      host.setAttribute("data-amenities-home", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) return host;
+    host.dataset.ready = FEATURED_VERSION;
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Amenities</p>
+            <h2>Built for a calm day out</h2>
+          </div>
+        </div>
+        <div class="amenities-home">
+          <article>
+            <h3>Free parking</h3>
+            <p>Park right in front of the mall for an easy stop.</p>
+          </article>
+          <article>
+            <h3>Clean modern toilets</h3>
+            <p>Fresh, modern washrooms on the floors for every visit.</p>
+          </article>
+          <article>
+            <h3>Peaceful shopping</h3>
+            <p>A calm, welcoming space for shoppers, tenants, and families.</p>
+          </article>
         </div>
       </div>
     `;
@@ -586,9 +655,10 @@
     const welcome = ensureWelcomeIntro();
     const featured = ensureFeaturedShops();
     const floors = ensureFloorsGuide();
+    const amenities = ensureAmenitiesHome();
     const rooftopImage = ensureRooftopHomeImage();
-    if (welcome && featured && floors && rooftopImage) {
-      placeHomeSections(welcome, featured, floors, rooftopImage);
+    if (welcome && featured && floors && amenities && rooftopImage) {
+      placeHomeSections(welcome, featured, floors, amenities, rooftopImage);
     }
   }
 
@@ -649,12 +719,16 @@
   async function paint() {
     forceShopLinks();
     hideBrokenNav();
+    ensureHeroBrowseButton();
     cleanLandingPage();
+    removeDuplicateMapAndHours();
     ensureHomeSections();
     ensureTourVideo();
     ensureRooftopImages();
     hideBrokenNav();
+    ensureHeroBrowseButton();
     cleanLandingPage();
+    removeDuplicateMapAndHours();
     const path = location.pathname.replace(/\/+$/, "") || "/";
     // Keep enrolled shops off the landing page; still sync /shop directory.
     if (path === "/shop") {

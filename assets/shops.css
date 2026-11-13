@@ -182,39 +182,85 @@
 }
 
 .welcome-intro {
-  max-width: 46rem;
+  max-width: 38rem;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+}
+
+.welcome-intro .kicker {
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+  letter-spacing: 0.16em;
 }
 
 .welcome-intro h2 {
   margin: 0;
-  font-size: clamp(1.7rem, 3.2vw, 2.5rem);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 560;
+  font-size: clamp(2rem, 4.2vw, 3.1rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--night);
 }
 
 .welcome-intro p {
   color: var(--ink-soft);
   margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.7;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+  font-size: 1.06rem;
+  line-height: 1.55;
+  max-width: 34rem;
+}
+
+.welcome-intro-lead {
+  color: var(--ink) !important;
+  font-size: 1.18rem !important;
+  font-weight: 500;
+}
+
+.amenities-home {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.amenities-home article {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px 20px 20px;
+}
+
+.amenities-home h3 {
+  margin: 0 0 8px;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 560;
+  font-size: 1.35rem;
+  color: var(--night);
+}
+
+.amenities-home p {
+  margin: 0;
+  color: var(--ink-soft);
 }
 
 .rooftop-home-bottom {
   margin: 0;
   border-radius: 24px;
   overflow: hidden;
-  background: #0d2e28;
+  background: #12261f;
   border: 1px solid var(--line);
 }
 
 .rooftop-home-bottom img {
   width: 100%;
-  height: min(72vh, 640px);
-  object-fit: cover;
+  height: auto;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: contain;
+  object-position: center top;
   display: block;
+  background: #12261f;
 }
 
 .rooftop-home-bottom figcaption {
@@ -365,11 +411,8 @@
 
 @media (max-width: 980px) {
   .featured-shops,
-  .floors-guide {
+  .floors-guide,
+  .amenities-home {
     grid-template-columns: 1fr;
-  }
-
-  .rooftop-home-bottom img {
-    height: min(48vh, 420px);
   }
 }
