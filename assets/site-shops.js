@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v6-floors-rooftop";
+  const FEATURED_VERSION = "videos-v7-rooftop-text-top";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -353,40 +353,72 @@
     });
   }
 
-  function placeHomeSections(rooftop, featured, floors) {
+  function placeHomeSections(rooftopText, featured, floors, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Order under hero: Rooftop Lounge → Featured shops → Floors guide
-    hero.insertAdjacentElement("afterend", rooftop);
-    rooftop.insertAdjacentElement("afterend", featured);
+    // Under hero: Rooftop text → Featured shops → Floors guide
+    hero.insertAdjacentElement("afterend", rooftopText);
+    rooftopText.insertAdjacentElement("afterend", featured);
     featured.insertAdjacentElement("afterend", floors);
+    // Rooftop image at the bottom of the page content
+    const anchor =
+      document.querySelector("footer") ||
+      document.querySelector(".visit-banner")?.closest("section") ||
+      floors;
+    if (anchor && anchor.parentNode) {
+      if (anchor.matches("footer")) anchor.insertAdjacentElement("beforebegin", rooftopImage);
+      else floors.insertAdjacentElement("afterend", rooftopImage);
+      // Keep image as the last section before footer if footer exists
+      const footer = document.querySelector("footer");
+      if (footer && rooftopImage.nextElementSibling !== footer) {
+        footer.insertAdjacentElement("beforebegin", rooftopImage);
+      }
+    }
   }
 
-  function ensureRooftopHome() {
+  function ensureRooftopHomeText() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return null;
 
-    let host = document.querySelector("[data-rooftop-home]");
+    let host = document.querySelector("[data-rooftop-home-text]");
     if (!host) {
       host = document.createElement("section");
-      host.className = "section";
-      host.setAttribute("data-rooftop-home", "1");
+      host.className = "section section--tight";
+      host.setAttribute("data-rooftop-home-text", "1");
     }
     if (host.dataset.ready === FEATURED_VERSION) return host;
     host.dataset.ready = FEATURED_VERSION;
     host.innerHTML = `
       <div class="wrap">
-        <div class="rooftop-home">
-          <div class="rooftop-home-media">
-            <img src="${ROOFTOP_IMAGE}" alt="${escapeAttr(ROOFTOP_ALT)}" />
-          </div>
-          <div class="rooftop-home-copy">
-            <p class="kicker">At the top</p>
-            <h2>Rooftop Lounge</h2>
-            <p>The lounge sits above the mall with Trade Square signage across the roof. Come up for evenings overlooking Kwekwe.</p>
-            <a class="btn" href="/dine/rooftop-lounge">See Rooftop Lounge</a>
-          </div>
+        <div class="rooftop-home-text">
+          <p class="kicker">At the top</p>
+          <h2>Rooftop Lounge</h2>
+          <p>The lounge sits above the mall with Trade Square signage across the roof. Come up for evenings overlooking Kwekwe.</p>
+          <a class="text-link" href="/dine/rooftop-lounge">See Rooftop Lounge <span aria-hidden="true">→</span></a>
         </div>
+      </div>
+    `;
+    return host;
+  }
+
+  function ensureRooftopHomeImage() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.querySelector("[data-rooftop-home-image]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section";
+      host.setAttribute("data-rooftop-home-image", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) return host;
+    host.dataset.ready = FEATURED_VERSION;
+    host.innerHTML = `
+      <div class="wrap">
+        <figure class="rooftop-home-bottom">
+          <img src="${ROOFTOP_IMAGE}" alt="${escapeAttr(ROOFTOP_ALT)}" />
+          <figcaption>Rooftop Lounge · Trade Square Mall</figcaption>
+        </figure>
       </div>
     `;
     return host;
@@ -503,10 +535,13 @@
   function ensureHomeSections() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return;
-    const rooftop = ensureRooftopHome();
+    const rooftopText = ensureRooftopHomeText();
     const featured = ensureFeaturedShops();
     const floors = ensureFloorsGuide();
-    if (rooftop && featured && floors) placeHomeSections(rooftop, featured, floors);
+    const rooftopImage = ensureRooftopHomeImage();
+    if (rooftopText && featured && floors && rooftopImage) {
+      placeHomeSections(rooftopText, featured, floors, rooftopImage);
+    }
   }
 
   function ensureRooftopImages() {
