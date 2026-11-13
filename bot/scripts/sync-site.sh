@@ -7,6 +7,11 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -a "$ROOT/index.html" "$ROOT/favicon.svg" \
   "$ROOT/trade-square-day.png" "$ROOT/trade-square-night.png" "$DEST/"
+for img in featured-barber-salon.jpg featured-clothes.jpg featured-shoes.jpg rooftop-lounge.jpg; do
+  if [[ -f "$ROOT/$img" ]]; then
+    cp -a "$ROOT/$img" "$DEST/"
+  fi
+done
 cp -a "$ROOT/assets" "$ROOT/shop" "$ROOT/shops" "$ROOT/enroll" "$ROOT/enrol" "$DEST/"
 # Optional large hero video
 if [[ "${SYNC_HERO_VIDEO:-0}" == "1" && -f "$ROOT/hero-bg.mp4" ]]; then
