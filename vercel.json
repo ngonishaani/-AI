@@ -39,7 +39,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!assets/|hero-bg\\.mp4|tour-aerial\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/((?!assets/|hero-bg\\.mp4|tour-aerial\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-printing\\.mp4|featured-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ],
@@ -52,7 +52,7 @@
       ]
     },
     {
-      "source": "/featured-(barber|sneakers|fashion).mp4",
+      "source": "/featured-(barber|sneakers|fashion|printing).mp4",
       "headers": [
         { "key": "Content-Type", "value": "video/mp4" },
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }

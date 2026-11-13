@@ -201,9 +201,17 @@
       video: "/featured-fashion.mp4",
       title: "Fashion shops video",
     },
+    {
+      slug: "printing",
+      name: "Printing and branding",
+      text: "Print, signage, and brand work for shops and offices.",
+      video: "/featured-printing.mp4",
+      title: "Printing and branding shop video",
+      href: "/shop",
+    },
   ];
 
-  const FEATURED_VERSION = "videos-v5-fashion-tour";
+  const FEATURED_VERSION = "videos-v6-floors-rooftop";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -345,22 +353,57 @@
     });
   }
 
-  function ensureFeaturedShops() {
-    const path = location.pathname.replace(/\/+$/, "") || "/";
-    if (path !== "/") return;
-
+  function placeHomeSections(rooftop, featured, floors) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
+    // Order under hero: Rooftop Lounge → Featured shops → Floors guide
+    hero.insertAdjacentElement("afterend", rooftop);
+    rooftop.insertAdjacentElement("afterend", featured);
+    featured.insertAdjacentElement("afterend", floors);
+  }
+
+  function ensureRooftopHome() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.querySelector("[data-rooftop-home]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section";
+      host.setAttribute("data-rooftop-home", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) return host;
+    host.dataset.ready = FEATURED_VERSION;
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="rooftop-home">
+          <div class="rooftop-home-media">
+            <img src="${ROOFTOP_IMAGE}" alt="${escapeAttr(ROOFTOP_ALT)}" />
+          </div>
+          <div class="rooftop-home-copy">
+            <p class="kicker">At the top</p>
+            <h2>Rooftop Lounge</h2>
+            <p>The lounge sits above the mall with Trade Square signage across the roof. Come up for evenings overlooking Kwekwe.</p>
+            <a class="btn" href="/dine/rooftop-lounge">See Rooftop Lounge</a>
+          </div>
+        </div>
+      </div>
+    `;
+    return host;
+  }
+
+  function ensureFeaturedShops() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
 
     let host = document.querySelector("[data-featured-shops]");
     if (!host) {
       host = document.createElement("section");
       host.className = "section";
       host.setAttribute("data-featured-shops", "1");
-      hero.insertAdjacentElement("afterend", host);
     }
 
-    if (host.dataset.ready === FEATURED_VERSION) return;
+    if (host.dataset.ready === FEATURED_VERSION) return host;
     host.dataset.ready = FEATURED_VERSION;
     host.innerHTML = `
       <div class="wrap">
@@ -401,6 +444,69 @@
     `;
 
     host.querySelectorAll(".featured-shop-video").forEach(bindLoopVideo);
+    return host;
+  }
+
+  function ensureFloorsGuide() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.querySelector("[data-floors-guide]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section";
+      host.setAttribute("data-floors-guide", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) return host;
+    host.dataset.ready = FEATURED_VERSION;
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">The building</p>
+            <h2>What is on each floor</h2>
+          </div>
+        </div>
+        <div class="floors-guide">
+          <article class="floors-guide-card">
+            <p class="kicker">Ground floor</p>
+            <h3>Four departments</h3>
+            <ol>
+              <li><strong>Kitchens</strong> — 25 sqm</li>
+              <li><strong>Hardwares</strong> — 25 sqm and 12 sqm</li>
+              <li><strong>Grocery stores</strong> — 25 sqm</li>
+              <li><strong>Offices</strong> — 12 sqm</li>
+            </ol>
+          </article>
+          <article class="floors-guide-card">
+            <p class="kicker">First floor</p>
+            <h3>Retail floors</h3>
+            <ul>
+              <li><strong>Clothing section</strong> — 12 sqm and 25 sqm</li>
+              <li><strong>Electronic accessories</strong> — 12 sqm and 25 sqm</li>
+            </ul>
+          </article>
+          <article class="floors-guide-card">
+            <p class="kicker">Second floor</p>
+            <h3>Learning and fitness</h3>
+            <ul>
+              <li><strong>Learning Center</strong> — fully furnished classrooms</li>
+              <li><strong>Gym</strong></li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    `;
+    return host;
+  }
+
+  function ensureHomeSections() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+    const rooftop = ensureRooftopHome();
+    const featured = ensureFeaturedShops();
+    const floors = ensureFloorsGuide();
+    if (rooftop && featured && floors) placeHomeSections(rooftop, featured, floors);
   }
 
   function ensureRooftopImages() {
@@ -460,7 +566,7 @@
   async function paint() {
     forceShopLinks();
     cleanLandingPage();
-    ensureFeaturedShops();
+    ensureHomeSections();
     ensureTourVideo();
     ensureRooftopImages();
     cleanLandingPage();
