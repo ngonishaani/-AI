@@ -203,9 +203,99 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v3-overlay";
+  const FEATURED_VERSION = "videos-v4-clean-home";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  function removeNode(node) {
+    if (node && node.parentNode) node.parentNode.removeChild(node);
+  }
+
+  function textMatches(el, re) {
+    return re.test((el?.textContent || "").replace(/\s+/g, " ").trim());
+  }
+
+  function cleanLandingPage() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+
+    // Cocktail bar & night club cards / links / photos
+    document
+      .querySelectorAll(
+        'a[href="/dine/cocktail-bar"], a[href="/dine/cocktail-bar/"], a[href*="cocktail-bar"]'
+      )
+      .forEach((link) => {
+        const card =
+          link.closest(".offer, .card, article, .feature, li, .event-row") || link;
+        removeNode(card);
+      });
+
+    document.querySelectorAll("h2, h3, p, a, span").forEach((el) => {
+      if (
+        textMatches(el, /cocktail\s*bar/i) ||
+        textMatches(el, /night\s*club/i) ||
+        textMatches(el, /see nightlife/i)
+      ) {
+        const card =
+          el.closest(".offer, .card, article, .feature, li, .event-row") || null;
+        if (card) removeNode(card);
+      }
+    });
+
+    // Rooftop nights block if it only framed nightlife
+    document.querySelectorAll("section, .section").forEach((section) => {
+      if (textMatches(section.querySelector("h2"), /rooftop nights/i)) {
+        removeNode(section);
+      }
+    });
+
+    // Shops on the floor + enrolled shops + placeholder directory on home
+    const shopSection = document.getElementById("shop");
+    if (shopSection) removeNode(shopSection);
+    document.querySelectorAll("[data-enrolled-home]").forEach(removeNode);
+    document.querySelectorAll("section, .section").forEach((section) => {
+      const heading = section.querySelector("h2");
+      if (
+        textMatches(heading, /shops on the floor/i) ||
+        textMatches(heading, /^enrolled shops$/i) ||
+        textMatches(heading, /^open now$/i)
+      ) {
+        removeNode(section);
+      }
+      if (textMatches(section.querySelector(".kicker"), /^open now$/i) && section.querySelector(".card-grid")) {
+        removeNode(section);
+      }
+    });
+
+    // Official opening → Coming soon
+    document.querySelectorAll("h1, h2, h3, .event-title, strong, em, span, p, time").forEach((el) => {
+      if (!el.childElementCount && textMatches(el, /official opening/i)) {
+        el.textContent = "Coming soon";
+      } else if (textMatches(el, /official opening/i) && el.children.length) {
+        el.childNodes.forEach((node) => {
+          if (node.nodeType === 3 && /official opening/i.test(node.textContent || "")) {
+            node.textContent = node.textContent.replace(/official opening/gi, "Coming soon");
+          }
+        });
+      }
+    });
+
+    document.querySelectorAll(".studio-facts li, .event-row, .feature, article").forEach((el) => {
+      if (textMatches(el, /26\s*september/i) || textMatches(el, /official opening/i)) {
+        const strong = el.querySelector("strong");
+        const span = el.querySelector("span");
+        if (strong && /26|september|opening/i.test(strong.textContent || "")) {
+          strong.textContent = "Coming soon";
+        }
+        if (span && /official opening|opening/i.test(span.textContent || "")) {
+          span.textContent = "Opening date";
+        }
+        el.querySelectorAll("h2, .event-title").forEach((title) => {
+          if (textMatches(title, /official opening/i)) title.textContent = "Coming soon";
+        });
+      }
+    });
+  }
 
   function ensureFeaturedShops() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -229,9 +319,7 @@
         <div class="section-head">
           <div>
             <p class="kicker">Featured shops</p>
-            <h2>Barber and saloon, sneakers, and fashion.</h2>
           </div>
-          <a class="text-link" href="${SHOP_PATH}">All shops <span aria-hidden="true">→</span></a>
         </div>
         <div class="featured-shops">
           ${FEATURED.map(
@@ -342,12 +430,16 @@
   let paintTimer = 0;
   async function paint() {
     forceShopLinks();
+    cleanLandingPage();
     ensureFeaturedShops();
     ensureRooftopImages();
-    const shops = await loadShops();
-    if (!shops.length) return;
-    ensureHomeSection(shops);
-    ensureDirectoryRail(shops);
+    cleanLandingPage();
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    // Keep enrolled shops off the landing page; still sync /shop directory.
+    if (path === "/shop") {
+      const shops = await loadShops();
+      if (shops.length) ensureDirectoryRail(shops);
+    }
   }
 
   function schedulePaint() {
