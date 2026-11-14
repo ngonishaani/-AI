@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v12-hero-video-only";
+  const FEATURED_VERSION = "videos-v13-amenities-photos";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -562,16 +562,25 @@
         </div>
         <div class="amenities-home">
           <article>
-            <h3>Free parking</h3>
+            <div class="amenities-home-media">
+              <img src="/amenity-parking.jpg" alt="Free customer parking at Trade Square Mall" loading="lazy" />
+            </div>
+            <h3>Free customer parking</h3>
             <p>Park right in front of the mall for an easy stop.</p>
           </article>
           <article>
+            <div class="amenities-home-media">
+              <img src="/amenity-toilets.jpg" alt="Clean modern toilets at Trade Square Mall" loading="lazy" />
+            </div>
             <h3>Clean modern toilets</h3>
             <p>Fresh, modern washrooms on the floors for every visit.</p>
           </article>
           <article>
-            <h3>Peaceful shopping</h3>
-            <p>A calm, welcoming space for shoppers, tenants, and families.</p>
+            <div class="amenities-home-media">
+              <img src="/amenity-solar.jpg" alt="Rooftop solar system at Trade Square Mall" loading="lazy" />
+            </div>
+            <h3>Solar system</h3>
+            <p>Rooftop solar power supporting a cleaner, more reliable mall.</p>
           </article>
         </div>
       </div>

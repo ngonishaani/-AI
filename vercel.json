@@ -39,7 +39,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!assets/|hero-bg\\.mp4|tour-aerial\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-printing\\.mp4|featured-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
+      "source": "/((?!assets/|hero-bg\\.mp4|tour-aerial\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-printing\\.mp4|featured-.*\\.jpg|amenity-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ],

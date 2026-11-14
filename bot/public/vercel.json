@@ -1,0 +1,69 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "",
+  "installCommand": "",
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/enroll",
+      "destination": "/enroll/index.html"
+    },
+    {
+      "source": "/enrol",
+      "destination": "/enrol/index.html"
+    },
+    {
+      "source": "/shop",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/shops",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/shops/(.*)",
+      "destination": "/shop/index.html"
+    },
+    {
+      "source": "/dine",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/visit",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/events",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!assets/|hero-bg\\.mp4|tour-aerial\\.mp4|featured-barber\\.mp4|featured-sneakers\\.mp4|featured-fashion\\.mp4|featured-printing\\.mp4|featured-.*\\.jpg|amenity-.*\\.jpg|rooftop-lounge\\.jpg|trade-square-.*\\.png|favicon\\.svg).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/hero-bg.mp4",
+      "headers": [
+        { "key": "Content-Type", "value": "video/mp4" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/featured-(barber|sneakers|fashion|printing).mp4",
+      "headers": [
+        { "key": "Content-Type", "value": "video/mp4" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/tour-aerial.mp4",
+      "headers": [
+        { "key": "Content-Type", "value": "video/mp4" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ]
+}
