@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v18-tour-lock";
+  const FEATURED_VERSION = "videos-v19-tour-in-floors";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -315,10 +315,11 @@
     else video.addEventListener("canplay", play, { once: true });
   }
 
-  function ensureTourVideo() {
+  function ensureTourVideo(frameEl) {
     const frame =
+      frameEl ||
+      document.querySelector("[data-floors-guide] .tour-frame") ||
       document.querySelector("[data-tour-home] .tour-frame") ||
-      document.querySelector(".tour-frame[data-owned-tour]") ||
       document.querySelector(".tour-frame");
     if (!frame) return;
     if (frame.dataset.tourVideo === FEATURED_VERSION) return;
@@ -392,8 +393,7 @@
       if (
         section.hasAttribute("data-shop-slider") ||
         section.hasAttribute("data-featured-shops") ||
-        section.hasAttribute("data-tour-home") ||
-        section.id === "tour"
+        section.hasAttribute("data-floors-guide")
       ) {
         return;
       }
@@ -527,65 +527,25 @@
     }
   }
 
-  function placeHomeSections(welcome, slider, featured, tour, floors, amenities, rooftopImage) {
+  function placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Welcome → Slider → Featured → Tour → Floors → Amenities → Rooftop
+    // Under hero: Welcome → Slider → Featured → Tour+Floors → Amenities → Rooftop
     hero.insertAdjacentElement("afterend", welcome);
     welcome.insertAdjacentElement("afterend", slider);
     slider.insertAdjacentElement("afterend", featured);
-    featured.insertAdjacentElement("afterend", tour);
-    tour.insertAdjacentElement("afterend", floors);
+    featured.insertAdjacentElement("afterend", floors);
     floors.insertAdjacentElement("afterend", amenities);
     const footer = document.querySelector("footer");
     if (footer) footer.insertAdjacentElement("beforebegin", rooftopImage);
     else amenities.insertAdjacentElement("afterend", rooftopImage);
   }
 
-  function ensureTourHome() {
-    const path = location.pathname.replace(/\/+$/, "") || "/";
-    if (path !== "/") return null;
-
-    // Drop SPA-owned tour blocks so React cannot pull the tour away again
+  function stripSpaTour() {
     document.querySelectorAll("#tour, .tour-frame").forEach((el) => {
-      const section = el.closest("section, .section") || el;
-      if (section.hasAttribute?.("data-tour-home")) return;
-      if (el.classList?.contains("tour-frame") && el.closest("[data-tour-home]")) return;
-      if (el.classList?.contains("tour-frame") && !el.closest("[data-tour-home]")) {
-        removeNode(el.closest("section, .section") || el);
-        return;
-      }
-      if (el.id === "tour" && !el.hasAttribute("data-tour-home")) removeNode(el);
+      if (el.closest("[data-floors-guide]")) return;
+      removeNode(el.closest("section, .section") || el);
     });
-
-    let host = document.querySelector("[data-tour-home]");
-    if (!host) {
-      host = document.createElement("section");
-      host.className = "section section--tight";
-      host.id = "tour";
-      host.setAttribute("data-tour-home", "1");
-    }
-    if (host.dataset.ready === FEATURED_VERSION) {
-      const frame = host.querySelector(".tour-frame");
-      if (frame && !frame.querySelector("video")) ensureTourVideo();
-      return host;
-    }
-    host.dataset.ready = FEATURED_VERSION;
-    host.setAttribute("data-tour-home", "1");
-    host.id = "tour";
-    host.innerHTML = `
-      <div class="wrap">
-        <div class="section-head">
-          <div>
-            <p class="kicker">Video</p>
-            <h2>Feature tour</h2>
-          </div>
-        </div>
-        <div class="tour-frame" data-owned-tour="1"></div>
-      </div>
-    `;
-    ensureTourVideo();
-    return host;
   }
 
   function bindShopSlider(host) {
@@ -850,10 +810,23 @@
       host.className = "section";
       host.setAttribute("data-floors-guide", "1");
     }
-    if (host.dataset.ready === FEATURED_VERSION) return host;
+    if (host.dataset.ready === FEATURED_VERSION) {
+      const frame = host.querySelector(".tour-frame");
+      if (frame && !frame.querySelector("video")) ensureTourVideo(frame);
+      return host;
+    }
     host.dataset.ready = FEATURED_VERSION;
     host.innerHTML = `
       <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Video</p>
+            <h2>Feature tour</h2>
+          </div>
+        </div>
+        <div class="tour-frame" data-owned-tour="1"></div>
+      </div>
+      <div class="wrap" style="margin-top:48px">
         <div class="section-head">
           <div>
             <p class="kicker">The building</p>
@@ -890,6 +863,7 @@
         </div>
       </div>
     `;
+    ensureTourVideo(host.querySelector(".tour-frame"));
     return host;
   }
 
@@ -898,16 +872,16 @@
     if (path !== "/") return;
     document.documentElement.classList.add("tsm-dark");
     document.body?.classList.add("tsm-dark");
+    stripSpaTour();
 
     const welcome = ensureWelcomeIntro();
     const featured = ensureFeaturedShops();
     const slider = ensureShopSlider();
-    const tour = ensureTourHome();
     const floors = ensureFloorsGuide();
     const amenities = ensureAmenitiesHome();
     const rooftopImage = ensureRooftopHomeImage();
-    if (welcome && featured && slider && tour && floors && amenities && rooftopImage) {
-      placeHomeSections(welcome, slider, featured, tour, floors, amenities, rooftopImage);
+    if (welcome && featured && slider && floors && amenities && rooftopImage) {
+      placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage);
     }
   }
 
