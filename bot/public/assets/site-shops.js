@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v15-slider-above";
+  const FEATURED_VERSION = "videos-v16-slider-step";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -531,6 +531,58 @@
     else amenities.insertAdjacentElement("afterend", rooftopImage);
   }
 
+  function bindShopSlider(host) {
+    const track = host.querySelector(".shop-slider-track");
+    if (!track || track.dataset.bound === "1") return;
+    track.dataset.bound = "1";
+
+    const count = SHOP_SLIDER.length;
+    let index = 0;
+    let paused = false;
+    let timer = 0;
+
+    const stepWidth = () => {
+      const tile = track.querySelector(".shop-slider-tile");
+      if (!tile) return 130;
+      const styles = getComputedStyle(track);
+      const gap = parseFloat(styles.gap || styles.columnGap || "12") || 12;
+      return tile.getBoundingClientRect().width + gap;
+    };
+
+    const render = (animate) => {
+      track.style.transition = animate ? "transform 0.55s ease" : "none";
+      track.style.transform = `translateX(${-index * stepWidth()}px)`;
+    };
+
+    const advance = () => {
+      if (paused) return;
+      index += 1;
+      render(true);
+      if (index >= count) {
+        window.setTimeout(() => {
+          index = 0;
+          render(false);
+        }, 560);
+      }
+    };
+
+    const start = () => {
+      clearInterval(timer);
+      timer = window.setInterval(advance, 2600);
+    };
+
+    host.addEventListener("mouseenter", () => {
+      paused = true;
+    });
+    host.addEventListener("mouseleave", () => {
+      paused = false;
+    });
+    window.addEventListener("resize", () => render(false));
+
+    render(false);
+    start();
+  }
+
   function ensureShopSlider() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return null;
@@ -541,7 +593,10 @@
       host.className = "section section--tight shop-slider-section";
       host.setAttribute("data-shop-slider", "1");
     }
-    if (host.dataset.ready === FEATURED_VERSION) return host;
+    if (host.dataset.ready === FEATURED_VERSION) {
+      bindShopSlider(host);
+      return host;
+    }
     host.dataset.ready = FEATURED_VERSION;
 
     const tiles = SHOP_SLIDER.map(
@@ -552,7 +607,7 @@
         </figure>`
     ).join("");
 
-    // Duplicate track for seamless infinite scroll left
+    // Duplicate once so the one-at-a-time loop can wrap seamlessly
     host.innerHTML = `
       <div class="wrap">
         <div class="section-head">
@@ -562,13 +617,14 @@
           </div>
         </div>
       </div>
-      <div class="shop-slider" aria-label="Shop storefronts scrolling left">
+      <div class="shop-slider" aria-label="Shop storefronts sliding left one at a time">
         <div class="shop-slider-track">
           ${tiles}
           ${tiles}
         </div>
       </div>
     `;
+    bindShopSlider(host);
     return host;
   }
 

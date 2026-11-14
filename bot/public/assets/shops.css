@@ -465,12 +465,8 @@
   width: max-content;
   gap: 12px;
   padding: 4px 16px 8px;
-  animation: shop-slider-scroll 48s linear infinite;
   will-change: transform;
-}
-
-.shop-slider:hover .shop-slider-track {
-  animation-play-state: paused;
+  transition: transform 0.55s ease;
 }
 
 .shop-slider-tile {
@@ -503,18 +499,10 @@
   text-overflow: ellipsis;
 }
 
-@keyframes shop-slider-scroll {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .shop-slider-track {
-    animation: none;
+    transition: none !important;
+    transform: none !important;
     flex-wrap: wrap;
     width: 100%;
     justify-content: center;
