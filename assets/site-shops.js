@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v14-shop-slider";
+  const FEATURED_VERSION = "videos-v15-slider-above";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -386,6 +386,7 @@
     if (shopSection) removeNode(shopSection);
     document.querySelectorAll("[data-enrolled-home]").forEach(removeNode);
     document.querySelectorAll("section, .section").forEach((section) => {
+      if (section.hasAttribute("data-shop-slider") || section.hasAttribute("data-featured-shops")) return;
       const heading = section.querySelector("h2");
       if (
         textMatches(heading, /shops on the floor/i) ||
@@ -516,14 +517,14 @@
     }
   }
 
-  function placeHomeSections(welcome, featured, slider, floors, amenities, rooftopImage) {
+  function placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Welcome → Featured → Shop slider → Floors → Amenities → Rooftop
+    // Under hero: Welcome → Shop slider → Featured → Floors → Amenities → Rooftop
     hero.insertAdjacentElement("afterend", welcome);
-    welcome.insertAdjacentElement("afterend", featured);
-    featured.insertAdjacentElement("afterend", slider);
-    slider.insertAdjacentElement("afterend", floors);
+    welcome.insertAdjacentElement("afterend", slider);
+    slider.insertAdjacentElement("afterend", featured);
+    featured.insertAdjacentElement("afterend", floors);
     floors.insertAdjacentElement("afterend", amenities);
     const footer = document.querySelector("footer");
     if (footer) footer.insertAdjacentElement("beforebegin", rooftopImage);
@@ -557,7 +558,7 @@
         <div class="section-head">
           <div>
             <p class="kicker">Inside the mall</p>
-            <h2>Shops on the floor</h2>
+            <h2>Tenant storefronts</h2>
           </div>
         </div>
       </div>
@@ -789,7 +790,7 @@
     const amenities = ensureAmenitiesHome();
     const rooftopImage = ensureRooftopHomeImage();
     if (welcome && featured && slider && floors && amenities && rooftopImage) {
-      placeHomeSections(welcome, featured, slider, floors, amenities, rooftopImage);
+      placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage);
     }
   }
 
