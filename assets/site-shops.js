@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v17-dark-tour";
+  const FEATURED_VERSION = "videos-v18-tour-lock";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -316,7 +316,10 @@
   }
 
   function ensureTourVideo() {
-    const frame = document.querySelector(".tour-frame");
+    const frame =
+      document.querySelector("[data-tour-home] .tour-frame") ||
+      document.querySelector(".tour-frame[data-owned-tour]") ||
+      document.querySelector(".tour-frame");
     if (!frame) return;
     if (frame.dataset.tourVideo === FEATURED_VERSION) return;
     frame.dataset.tourVideo = FEATURED_VERSION;
@@ -543,7 +546,19 @@
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return null;
 
-    let host = document.getElementById("tour") || document.querySelector("[data-tour-home]");
+    // Drop SPA-owned tour blocks so React cannot pull the tour away again
+    document.querySelectorAll("#tour, .tour-frame").forEach((el) => {
+      const section = el.closest("section, .section") || el;
+      if (section.hasAttribute?.("data-tour-home")) return;
+      if (el.classList?.contains("tour-frame") && el.closest("[data-tour-home]")) return;
+      if (el.classList?.contains("tour-frame") && !el.closest("[data-tour-home]")) {
+        removeNode(el.closest("section, .section") || el);
+        return;
+      }
+      if (el.id === "tour" && !el.hasAttribute("data-tour-home")) removeNode(el);
+    });
+
+    let host = document.querySelector("[data-tour-home]");
     if (!host) {
       host = document.createElement("section");
       host.className = "section section--tight";
@@ -551,11 +566,13 @@
       host.setAttribute("data-tour-home", "1");
     }
     if (host.dataset.ready === FEATURED_VERSION) {
-      ensureTourVideo();
+      const frame = host.querySelector(".tour-frame");
+      if (frame && !frame.querySelector("video")) ensureTourVideo();
       return host;
     }
     host.dataset.ready = FEATURED_VERSION;
     host.setAttribute("data-tour-home", "1");
+    host.id = "tour";
     host.innerHTML = `
       <div class="wrap">
         <div class="section-head">
@@ -564,7 +581,7 @@
             <h2>Feature tour</h2>
           </div>
         </div>
-        <div class="tour-frame"></div>
+        <div class="tour-frame" data-owned-tour="1"></div>
       </div>
     `;
     ensureTourVideo();
