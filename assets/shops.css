@@ -332,6 +332,7 @@
 
 .featured-shop-media video,
 .featured-shop-video {
+  transition: opacity 0.2s ease;
   position: absolute;
   inset: 0;
   width: 100%;

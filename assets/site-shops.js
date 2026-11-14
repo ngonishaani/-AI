@@ -183,7 +183,7 @@
       slug: "barbers",
       name: "Barber and saloon",
       text: "Cuts, wash, style, and colour on the ground floor.",
-      video: "/featured-barber.mp4",
+      video: "/featured-barber.mp4?v=11",
       title: "Barber and saloon video",
     },
     {
@@ -211,12 +211,12 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v10-trim";
+  const FEATURED_VERSION = "videos-v11-barber-skip";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
 
-  function bindLoopVideo(video) {
+  function bindLoopVideo(video, startAt = 0) {
     if (!video || video.dataset.boundLoop === "1") return;
     video.dataset.boundLoop = "1";
     video.removeAttribute("controls");
@@ -227,14 +227,45 @@
     video.playsInline = true;
     video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
+    video.style.opacity = "0";
+
+    const skip = Math.max(0, Number(startAt) || 0);
+    const reveal = () => {
+      video.style.opacity = "1";
+    };
+    const seekStart = () => {
+      if (skip > 0 && video.currentTime < skip) {
+        try {
+          video.currentTime = skip;
+        } catch (_) {}
+      }
+    };
     const play = () => {
       video.muted = true;
+      seekStart();
       return video.play().catch(() => {});
     };
-    play();
+
+    video.addEventListener("loadeddata", () => {
+      seekStart();
+      play();
+    });
+    video.addEventListener("seeked", () => {
+      if (skip <= 0 || video.currentTime >= skip - 0.05) reveal();
+    }, { once: true });
+    video.addEventListener("timeupdate", () => {
+      if (skip > 0 && video.currentTime < skip) seekStart();
+      // Loop back before native loop hits the white intro again
+      if (skip > 0 && video.duration && video.currentTime > video.duration - 0.25) {
+        video.currentTime = skip;
+      }
+    });
     video.addEventListener("pause", () => {
       if (!video.ended) play();
     });
+    if (skip <= 0) {
+      video.addEventListener("playing", reveal, { once: true });
+    }
     if (video.readyState >= 2) play();
     else video.addEventListener("canplay", play, { once: true });
   }
@@ -569,6 +600,7 @@
                   class="featured-shop-video"
                   src="${escapeAttr(shop.video)}"
                   title="${escapeAttr(shop.title)}"
+                  data-start-at="${escapeAttr(String(shop.startAt || 0))}"
                   autoplay
                   muted
                   loop
@@ -591,7 +623,10 @@
       </div>
     `;
 
-    host.querySelectorAll(".featured-shop-video").forEach(bindLoopVideo);
+    host.querySelectorAll(".featured-shop-video").forEach((video) => {
+      const startAt = Number(video.dataset.startAt || 0);
+      bindLoopVideo(video, startAt);
+    });
     return host;
   }
 
