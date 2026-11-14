@@ -211,10 +211,24 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v13-amenities-photos";
+  const FEATURED_VERSION = "videos-v14-shop-slider";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  const SHOP_SLIDER = [
+    { src: "/shop-slider/01-royale-ape.jpg", name: "Royale Ape Studios" },
+    { src: "/shop-slider/02-royal-touch.jpg", name: "Royal Touch Beauty Parlour" },
+    { src: "/shop-slider/03-foreign-drip.jpg", name: "Kwekwe Foreign Drip" },
+    { src: "/shop-slider/04-101-kicks.jpg", name: "101 Kicks ZW" },
+    { src: "/shop-slider/05-bevy-beauty.jpg", name: "Bevy Beauty & Accessories" },
+    { src: "/shop-slider/06-hatiperi-starlinks.jpg", name: "Hatiperi Starlinks" },
+    { src: "/shop-slider/07-gabs-courier.jpg", name: "GABS Courier" },
+    { src: "/shop-slider/08-books-r-us.jpg", name: "Books R Us" },
+    { src: "/shop-slider/09-fashion-floor.jpg", name: "Fashion floor" },
+    { src: "/shop-slider/10-kids-fashion.jpg", name: "Kids fashion" },
+    { src: "/shop-slider/11-boutique.jpg", name: "Boutique" },
+  ];
 
   function ensureHeroVideoOnly() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -502,17 +516,59 @@
     }
   }
 
-  function placeHomeSections(welcome, featured, floors, amenities, rooftopImage) {
+  function placeHomeSections(welcome, featured, slider, floors, amenities, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Welcome → Featured → Floors → Amenities → Rooftop image near end
+    // Under hero: Welcome → Featured → Shop slider → Floors → Amenities → Rooftop
     hero.insertAdjacentElement("afterend", welcome);
     welcome.insertAdjacentElement("afterend", featured);
-    featured.insertAdjacentElement("afterend", floors);
+    featured.insertAdjacentElement("afterend", slider);
+    slider.insertAdjacentElement("afterend", floors);
     floors.insertAdjacentElement("afterend", amenities);
     const footer = document.querySelector("footer");
     if (footer) footer.insertAdjacentElement("beforebegin", rooftopImage);
     else amenities.insertAdjacentElement("afterend", rooftopImage);
+  }
+
+  function ensureShopSlider() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.querySelector("[data-shop-slider]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section section--tight shop-slider-section";
+      host.setAttribute("data-shop-slider", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) return host;
+    host.dataset.ready = FEATURED_VERSION;
+
+    const tiles = SHOP_SLIDER.map(
+      (shop) => `
+        <figure class="shop-slider-tile">
+          <img src="${escapeAttr(shop.src)}" alt="${escapeAttr(shop.name)}" loading="lazy" />
+          <figcaption>${escapeHtml(shop.name)}</figcaption>
+        </figure>`
+    ).join("");
+
+    // Duplicate track for seamless infinite scroll left
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Inside the mall</p>
+            <h2>Shops on the floor</h2>
+          </div>
+        </div>
+      </div>
+      <div class="shop-slider" aria-label="Shop storefronts scrolling left">
+        <div class="shop-slider-track">
+          ${tiles}
+          ${tiles}
+        </div>
+      </div>
+    `;
+    return host;
   }
 
   function ensureWelcomeIntro() {
@@ -728,11 +784,12 @@
     if (path !== "/") return;
     const welcome = ensureWelcomeIntro();
     const featured = ensureFeaturedShops();
+    const slider = ensureShopSlider();
     const floors = ensureFloorsGuide();
     const amenities = ensureAmenitiesHome();
     const rooftopImage = ensureRooftopHomeImage();
-    if (welcome && featured && floors && amenities && rooftopImage) {
-      placeHomeSections(welcome, featured, floors, amenities, rooftopImage);
+    if (welcome && featured && slider && floors && amenities && rooftopImage) {
+      placeHomeSections(welcome, featured, slider, floors, amenities, rooftopImage);
     }
   }
 
