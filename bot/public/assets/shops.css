@@ -1,5 +1,99 @@
 /* Enrolled shops directory + homepage injections */
 
+/* Dark theme */
+html.tsm-dark,
+html.tsm-dark body,
+body.tsm-dark {
+  --paper: #0b1411;
+  --paper-deep: #12201b;
+  --cream: #15241e;
+  --ink: #e8f0ec;
+  --ink-soft: #b8c7c0;
+  --muted: #8d9e96;
+  --line: rgba(232, 240, 236, 0.12);
+  --night: #0f2f28;
+  --night-2: #0a221c;
+  --brass: #9fd6c2;
+  background: var(--paper);
+  color: var(--ink);
+  color-scheme: dark;
+}
+
+html.tsm-dark .nav,
+html.tsm-dark .nav--light,
+body.tsm-dark .nav,
+body.tsm-dark .nav--light {
+  background: rgba(11, 20, 17, 0.92);
+  color: var(--ink);
+  border-bottom-color: var(--line);
+}
+
+html.tsm-dark .menu,
+body.tsm-dark .menu {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html.tsm-dark .welcome-intro h2,
+html.tsm-dark .amenities-home h3,
+html.tsm-dark .floors-guide-card h3,
+html.tsm-dark .featured-shop-copy h3,
+html.tsm-dark .section-head h2,
+body.tsm-dark .welcome-intro h2,
+body.tsm-dark .amenities-home h3,
+body.tsm-dark .floors-guide-card h3,
+body.tsm-dark .featured-shop-copy h3,
+body.tsm-dark .section-head h2 {
+  color: #f2f7f4;
+}
+
+html.tsm-dark .featured-shop,
+html.tsm-dark .amenities-home article,
+html.tsm-dark .floors-guide-card,
+html.tsm-dark .shop-slider-tile,
+html.tsm-dark .offer,
+html.tsm-dark .card,
+html.tsm-dark .panel,
+body.tsm-dark .featured-shop,
+body.tsm-dark .amenities-home article,
+body.tsm-dark .floors-guide-card,
+body.tsm-dark .shop-slider-tile,
+body.tsm-dark .offer,
+body.tsm-dark .card,
+body.tsm-dark .panel {
+  background: #13241e;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+html.tsm-dark .shop-slider-tile figcaption,
+body.tsm-dark .shop-slider-tile figcaption {
+  color: var(--ink-soft);
+}
+
+html.tsm-dark .footer,
+body.tsm-dark .footer {
+  background: #07110e;
+}
+
+html.tsm-dark .btn--line,
+body.tsm-dark .btn--line {
+  color: #f2f7f4;
+  border-color: rgba(242, 247, 244, 0.35);
+}
+
+html.tsm-dark .studio-hero:not(.studio-hero--video),
+body.tsm-dark .studio-hero:not(.studio-hero--video) {
+  background: #0d1c17;
+}
+
+html.tsm-dark .studio-hero-grid,
+body.tsm-dark .studio-hero-grid {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 /* Hero: video only — no poster / still image */
 .studio-hero--video .hero-video-wrap {
   background: #0d2e28 !important;
@@ -247,7 +341,7 @@
 }
 
 .amenities-home article {
-  background: #fff;
+  background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 0 0 18px;
@@ -313,7 +407,7 @@
 }
 
 .floors-guide-card {
-  background: #fff;
+  background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 22px 20px 20px;
@@ -347,7 +441,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: #fff;
+  background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 18px;
   overflow: hidden;
@@ -473,11 +567,11 @@
   flex: 0 0 auto;
   width: 118px;
   margin: 0;
-  background: #fff;
+  background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 4px 14px rgba(33, 33, 33, 0.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 .shop-slider-tile img {

@@ -180,19 +180,19 @@
 
   const FEATURED = [
     {
-      slug: "barbers",
-      name: "Barber and saloon",
-      text: "Cuts, wash, style, and colour on the ground floor.",
-      video: "/featured-barber.mp4?v=11",
-      title: "Barber and saloon video",
-    },
-    {
       slug: "shoes",
       name: "Sneaker shops",
       text: "Trainers and everyday footwear on the shop floor.",
       video: "/featured-sneakers.mp4",
       title: "Sneaker shops video",
       href: "/shop",
+    },
+    {
+      slug: "barbers",
+      name: "Barber and saloon",
+      text: "Cuts, wash, style, and colour on the ground floor.",
+      video: "/featured-barber.mp4?v=11",
+      title: "Barber and saloon video",
     },
     {
       slug: "clothing",
@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v16-slider-step";
+  const FEATURED_VERSION = "videos-v17-dark-tour";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -386,7 +386,14 @@
     if (shopSection) removeNode(shopSection);
     document.querySelectorAll("[data-enrolled-home]").forEach(removeNode);
     document.querySelectorAll("section, .section").forEach((section) => {
-      if (section.hasAttribute("data-shop-slider") || section.hasAttribute("data-featured-shops")) return;
+      if (
+        section.hasAttribute("data-shop-slider") ||
+        section.hasAttribute("data-featured-shops") ||
+        section.hasAttribute("data-tour-home") ||
+        section.id === "tour"
+      ) {
+        return;
+      }
       const heading = section.querySelector("h2");
       if (
         textMatches(heading, /shops on the floor/i) ||
@@ -517,18 +524,51 @@
     }
   }
 
-  function placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage) {
+  function placeHomeSections(welcome, slider, featured, tour, floors, amenities, rooftopImage) {
     const hero = document.querySelector(".studio-hero");
     if (!hero || !hero.parentNode) return;
-    // Under hero: Welcome → Shop slider → Featured → Floors → Amenities → Rooftop
+    // Under hero: Welcome → Slider → Featured → Tour → Floors → Amenities → Rooftop
     hero.insertAdjacentElement("afterend", welcome);
     welcome.insertAdjacentElement("afterend", slider);
     slider.insertAdjacentElement("afterend", featured);
-    featured.insertAdjacentElement("afterend", floors);
+    featured.insertAdjacentElement("afterend", tour);
+    tour.insertAdjacentElement("afterend", floors);
     floors.insertAdjacentElement("afterend", amenities);
     const footer = document.querySelector("footer");
     if (footer) footer.insertAdjacentElement("beforebegin", rooftopImage);
     else amenities.insertAdjacentElement("afterend", rooftopImage);
+  }
+
+  function ensureTourHome() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return null;
+
+    let host = document.getElementById("tour") || document.querySelector("[data-tour-home]");
+    if (!host) {
+      host = document.createElement("section");
+      host.className = "section section--tight";
+      host.id = "tour";
+      host.setAttribute("data-tour-home", "1");
+    }
+    if (host.dataset.ready === FEATURED_VERSION) {
+      ensureTourVideo();
+      return host;
+    }
+    host.dataset.ready = FEATURED_VERSION;
+    host.setAttribute("data-tour-home", "1");
+    host.innerHTML = `
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Video</p>
+            <h2>Feature tour</h2>
+          </div>
+        </div>
+        <div class="tour-frame"></div>
+      </div>
+    `;
+    ensureTourVideo();
+    return host;
   }
 
   function bindShopSlider(host) {
@@ -613,7 +653,7 @@
         <div class="section-head">
           <div>
             <p class="kicker">Inside the mall</p>
-            <h2>Tenant storefronts</h2>
+            <h2>Know before you visit</h2>
           </div>
         </div>
       </div>
@@ -839,14 +879,18 @@
   function ensureHomeSections() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return;
+    document.documentElement.classList.add("tsm-dark");
+    document.body?.classList.add("tsm-dark");
+
     const welcome = ensureWelcomeIntro();
     const featured = ensureFeaturedShops();
     const slider = ensureShopSlider();
+    const tour = ensureTourHome();
     const floors = ensureFloorsGuide();
     const amenities = ensureAmenitiesHome();
     const rooftopImage = ensureRooftopHomeImage();
-    if (welcome && featured && slider && floors && amenities && rooftopImage) {
-      placeHomeSections(welcome, slider, featured, floors, amenities, rooftopImage);
+    if (welcome && featured && slider && tour && floors && amenities && rooftopImage) {
+      placeHomeSections(welcome, slider, featured, tour, floors, amenities, rooftopImage);
     }
   }
 
@@ -912,13 +956,13 @@
     cleanLandingPage();
     removeDuplicateMapAndHours();
     ensureHomeSections();
-    ensureTourVideo();
     ensureRooftopImages();
     hideBrokenNav();
     ensureHeroBrowseButton();
     ensureHeroVideoOnly();
     cleanLandingPage();
     removeDuplicateMapAndHours();
+    ensureHomeSections();
     const path = location.pathname.replace(/\/+$/, "") || "/";
     // Keep enrolled shops off the landing page; still sync /shop directory.
     if (path === "/shop") {
