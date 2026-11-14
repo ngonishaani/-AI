@@ -211,10 +211,41 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v11-barber-skip";
+  const FEATURED_VERSION = "videos-v12-hero-video-only";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
+
+  function ensureHeroVideoOnly() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") return;
+
+    const hero = document.querySelector(".studio-hero");
+    if (!hero) return;
+
+    // Drop still images / poster so the hero is video-only
+    hero.querySelectorAll(".studio-photos, .hero-img, img.hero-img").forEach(removeNode);
+    hero.querySelectorAll("img").forEach((img) => {
+      if (img.closest(".hero-video-wrap")) return;
+      removeNode(img.closest("figure") || img);
+    });
+
+    const video = hero.querySelector(".hero-video, video");
+    if (video) {
+      video.removeAttribute("poster");
+      video.poster = "";
+      video.setAttribute("preload", "auto");
+      video.muted = true;
+      video.playsInline = true;
+      video.play?.().catch(() => {});
+    }
+
+    const wrap = hero.querySelector(".hero-video-wrap");
+    if (wrap) {
+      wrap.style.backgroundImage = "none";
+      wrap.style.backgroundColor = "#0d2e28";
+    }
+  }
 
   function bindLoopVideo(video, startAt = 0) {
     if (!video || video.dataset.boundLoop === "1") return;
@@ -754,6 +785,7 @@
     forceShopLinks();
     hideBrokenNav();
     ensureHeroBrowseButton();
+    ensureHeroVideoOnly();
     cleanLandingPage();
     removeDuplicateMapAndHours();
     ensureHomeSections();
@@ -761,6 +793,7 @@
     ensureRooftopImages();
     hideBrokenNav();
     ensureHeroBrowseButton();
+    ensureHeroVideoOnly();
     cleanLandingPage();
     removeDuplicateMapAndHours();
     const path = location.pathname.replace(/\/+$/, "") || "/";

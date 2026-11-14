@@ -1,5 +1,27 @@
 /* Enrolled shops directory + homepage injections */
 
+/* Hero: video only — no poster / still image */
+.studio-hero--video .hero-video-wrap {
+  background: #0d2e28 !important;
+  background-image: none !important;
+}
+.studio-hero--video .hero-video {
+  display: block !important;
+}
+.studio-hero .studio-photos,
+.studio-hero .hero-img {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-hero--video .hero-video {
+    display: block !important;
+  }
+  .studio-hero--video .hero-video-wrap {
+    background: #0d2e28 !important;
+    background-image: none !important;
+  }
+}
+
 .enrolled-home,
 .enrolled-directory {
   margin-bottom: 36px;
