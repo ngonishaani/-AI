@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v19-tour-in-floors";
+  const FEATURED_VERSION = "videos-v20-light-spacing";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -826,7 +826,7 @@
         </div>
         <div class="tour-frame" data-owned-tour="1"></div>
       </div>
-      <div class="wrap" style="margin-top:48px">
+      <div class="wrap floors-guide-wrap">
         <div class="section-head">
           <div>
             <p class="kicker">The building</p>
@@ -870,8 +870,8 @@
   function ensureHomeSections() {
     const path = location.pathname.replace(/\/+$/, "") || "/";
     if (path !== "/") return;
-    document.documentElement.classList.add("tsm-dark");
-    document.body?.classList.add("tsm-dark");
+    document.documentElement.classList.remove("tsm-dark");
+    document.body?.classList.remove("tsm-dark");
     stripSpaTour();
 
     const welcome = ensureWelcomeIntro();
