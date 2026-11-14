@@ -1,14 +1,14 @@
 /* Enrolled shops directory + homepage injections */
 
-/* Light theme + tighter homepage spacing */
+/* Homepage spacing */
 [data-welcome-intro],
 [data-shop-slider],
 [data-featured-shops],
 [data-floors-guide],
 [data-amenities-home],
 [data-rooftop-home-image] {
-  padding-top: 36px;
-  padding-bottom: 28px;
+  padding-top: 40px;
+  padding-bottom: 36px;
 }
 
 [data-welcome-intro] {
@@ -18,33 +18,85 @@
 
 [data-shop-slider] {
   padding-top: 8px;
-  padding-bottom: 16px;
-}
-
-[data-featured-shops] {
-  padding-top: 20px;
-}
-
-[data-floors-guide] {
-  padding-top: 28px;
-}
-
-[data-amenities-home] {
-  padding-top: 24px;
-  padding-bottom: 24px;
+  padding-bottom: 20px;
 }
 
 [data-rooftop-home-image] {
-  padding-top: 16px;
-  padding-bottom: 40px;
+  padding-top: 20px;
+  padding-bottom: 48px;
 }
 
 .section-head {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.section-head .kicker {
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+}
+
+.section-head h2 {
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 560;
+  font-size: clamp(2.2rem, 4.8vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-top: 6px;
 }
 
 .floors-guide-wrap {
-  margin-top: 28px;
+  margin-top: 36px;
+}
+
+/* Mixed light / dark bands */
+[data-welcome-intro],
+[data-shop-slider],
+[data-floors-guide],
+[data-rooftop-home-image] {
+  background: transparent;
+  color: var(--ink);
+}
+
+[data-featured-shops],
+[data-amenities-home] {
+  background: #0f241e;
+  color: #e8f0ec;
+}
+
+[data-featured-shops] .section-head .kicker,
+[data-amenities-home] .section-head .kicker {
+  color: #9fd6c2;
+}
+
+[data-featured-shops] .section-head h2,
+[data-amenities-home] .section-head h2 {
+  color: #f4faf7;
+}
+
+[data-featured-shops] .featured-shop,
+[data-amenities-home] .amenities-home article {
+  background: #17352c;
+  border-color: rgba(232, 240, 236, 0.14);
+  color: #e8f0ec;
+}
+
+[data-featured-shops] .featured-shop-copy h3,
+[data-amenities-home] .amenities-home h3 {
+  color: #f4faf7;
+}
+
+[data-featured-shops] .featured-shop-copy p,
+[data-amenities-home] .amenities-home p,
+[data-featured-shops] .featured-shop-copy .text-link {
+  color: #b8c7c0;
+}
+
+[data-floors-guide] .section-head h2 {
+  color: var(--night);
+}
+
+[data-floors-guide] .tour-frame {
+  border-color: var(--line);
 }
 
 /* Hero: video only — no poster / still image */
@@ -266,8 +318,8 @@
   margin: 0;
   font-family: "Fraunces", "Times New Roman", serif;
   font-weight: 560;
-  font-size: clamp(2rem, 4.2vw, 3.1rem);
-  line-height: 1.08;
+  font-size: clamp(2.35rem, 5vw, 3.5rem);
+  line-height: 1.05;
   letter-spacing: -0.03em;
   color: var(--night);
 }
@@ -319,7 +371,7 @@
   margin: 16px 18px 8px;
   font-family: "Fraunces", "Times New Roman", serif;
   font-weight: 560;
-  font-size: 1.35rem;
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
   color: var(--night);
 }
 
@@ -368,7 +420,9 @@
 
 .floors-guide-card h3 {
   margin: 6px 0 14px;
-  font-size: 1.35rem;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 560;
+  font-size: clamp(1.4rem, 2.4vw, 1.85rem);
 }
 
 .floors-guide-card ol,
@@ -477,11 +531,11 @@
 }
 
 .featured-shop-copy h3 {
-  font-family: var(--serif);
-  font-weight: 500;
-  font-size: 1.45rem;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 560;
+  font-size: clamp(1.45rem, 2.5vw, 1.95rem);
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.12;
   margin: 0;
 }
 

@@ -211,7 +211,7 @@
     },
   ];
 
-  const FEATURED_VERSION = "videos-v20-light-spacing";
+  const FEATURED_VERSION = "videos-v21-mixed-headings";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -758,7 +758,8 @@
       <div class="wrap">
         <div class="section-head">
           <div>
-            <p class="kicker">Featured shops</p>
+            <p class="kicker">On the floor</p>
+            <h2>Featured shops</h2>
           </div>
         </div>
         <div class="featured-shops">
