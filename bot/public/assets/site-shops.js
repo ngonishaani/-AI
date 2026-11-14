@@ -185,14 +185,7 @@
       text: "Trainers and everyday footwear on the shop floor.",
       video: "/featured-sneakers.mp4",
       title: "Sneaker shops video",
-      href: "/shop",
-    },
-    {
-      slug: "barbers",
-      name: "Barber and saloon",
-      text: "Cuts, wash, style, and colour on the ground floor.",
-      video: "/featured-barber.mp4?v=11",
-      title: "Barber and saloon video",
+      href: "#",
     },
     {
       slug: "clothing",
@@ -200,6 +193,7 @@
       text: "Clothing and fashion on the upper floor.",
       video: "/featured-fashion.mp4",
       title: "Fashion shops video",
+      href: "#",
     },
     {
       slug: "printing",
@@ -207,11 +201,11 @@
       text: "Print, signage, and brand work for shops and offices.",
       video: "/featured-printing.mp4",
       title: "Printing and branding shop video",
-      href: "/shop",
+      href: "#",
     },
   ];
 
-  const FEATURED_VERSION = "videos-v21-mixed-headings";
+  const FEATURED_VERSION = "videos-v22-no-barber";
   const TOUR_VIDEO = "/tour-aerial.mp4";
   const ROOFTOP_IMAGE = "/rooftop-lounge.jpg";
   const ROOFTOP_ALT = "Trade Square Rooftop Lounge signage on the building facade";
@@ -440,32 +434,41 @@
     });
   }
 
-  function hideBrokenNav() {
-    const hideHref = (href) => {
-      const path = String(href || "").replace(/\/+$/, "") || "/";
-      return (
-        path === "/enroll" ||
-        path === "/enrol" ||
-        path === "/shop" ||
-        path === "/shops" ||
-        path === "/dine" ||
-        path === "/events" ||
-        path === "/visit" ||
-        /\/shop\//.test(path) ||
-        /\/dine\//.test(path) ||
-        /enroll/i.test(path)
-      );
-    };
+  function isDeadLink(href) {
+    const path = String(href || "").replace(/\/+$/, "") || "/";
+    if (path === "#" || path === "/#" || path.startsWith("#")) return false;
+    return (
+      path === "/enroll" ||
+      path === "/enrol" ||
+      path === "/shop" ||
+      path === "/shops" ||
+      path === "/dine" ||
+      path === "/events" ||
+      path === "/visit" ||
+      /\/shop\//.test(path) ||
+      /\/dine\//.test(path) ||
+      /enroll/i.test(path)
+    );
+  }
 
-    document.querySelectorAll(".nav-links a, .menu nav a, .footer-grid a, header a, .menu a").forEach((a) => {
+  function patchDeadLinks() {
+    document.querySelectorAll("a[href]").forEach((a) => {
       const href = a.getAttribute("href") || "";
-      if (hideHref(href) || /enrol/i.test(a.textContent || "")) {
-        const li = a.closest("li");
-        if (li) removeNode(li);
-        else removeNode(a);
+      if (/browse the shops/i.test(a.textContent || "")) return;
+      if (isDeadLink(href) || /enrol/i.test(a.textContent || "")) {
+        a.setAttribute("href", "#");
+        a.addEventListener(
+          "click",
+          (event) => {
+            event.preventDefault();
+          },
+          { once: false }
+        );
       }
     });
+  }
 
+  function hideBrokenNav() {
     document.querySelectorAll('[data-enrol-link="1"]').forEach(removeNode);
 
     // Hide Menu control when nav items are cleared
@@ -480,12 +483,14 @@
       menu.setAttribute("hidden", "");
     });
 
-    // Keep Browse the shops; hide other incomplete hero CTAs (e.g. Book a tour / visit)
+    // Keep Browse the shops; point other incomplete hero CTAs to #
     document.querySelectorAll(".hero-actions a, .studio-copy a").forEach((a) => {
       if (/browse the shops/i.test(a.textContent || "")) return;
       const href = a.getAttribute("href") || "";
-      if (hideHref(href)) removeNode(a);
+      if (isDeadLink(href)) a.setAttribute("href", "#");
     });
+
+    patchDeadLinks();
   }
 
   function ensureHeroBrowseButton() {
@@ -498,12 +503,12 @@
     );
     if (existing) {
       existing.classList.add("btn");
-      existing.href = "/shop";
+      existing.href = "#";
       return;
     }
     const btn = document.createElement("a");
     btn.className = "btn";
-    btn.href = "/shop";
+    btn.href = "#";
     btn.textContent = "Browse the shops";
     actions.insertBefore(btn, actions.firstChild);
   }
@@ -765,7 +770,7 @@
         <div class="featured-shops">
           ${FEATURED.map(
             (shop) => `
-            <a class="featured-shop" href="${escapeAttr(shop.href || `/shop/${shop.slug}`)}">
+            <a class="featured-shop" href="${escapeAttr(shop.href || "#")}">
               <div class="featured-shop-media">
                 <video
                   class="featured-shop-video"
@@ -914,29 +919,12 @@
   }
 
   function forceShopLinks() {
-    document.querySelectorAll('a[href="/shops"], a[href="/shops/"]').forEach((a) => {
-      a.setAttribute("href", SHOP_PATH);
-    });
-
-    // Prefer the enrolled shops page over the SPA placeholder directory.
-    document.querySelectorAll('a[href="/shop"], a[href="/shop/"]').forEach((a) => {
-      if (a.dataset.enrolledNav === "1") return;
-      a.dataset.enrolledNav = "1";
-      a.addEventListener(
-        "click",
-        (event) => {
-          if (document.getElementById("shops-grid")) return;
-          if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-            return;
-          }
-          if (event.button !== 0) return;
-          event.preventDefault();
-          event.stopPropagation();
-          window.location.assign(SHOP_PATH);
-        },
-        true
-      );
-    });
+    // Incomplete shop / directory routes stay as # placeholders for now
+    document
+      .querySelectorAll('a[href="/shops"], a[href="/shops/"], a[href="/shop"], a[href="/shop/"], a[href^="/shop/"]')
+      .forEach((a) => {
+        a.setAttribute("href", "#");
+      });
   }
 
   let paintTimer = 0;
